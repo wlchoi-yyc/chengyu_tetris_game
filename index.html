@@ -1,0 +1,174 @@
+<!DOCTYPE html><html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8">
+  <title>成語俄羅斯方塊遊戲</title>
+  <style>
+    body { font-family: sans-serif; text-align: center; margin: 20px; }
+    #score { font-size: 20px; margin-bottom: 10px; }
+    #game { display: inline-block; }
+    #grid { display: flex; }
+    .column {
+      width: 60px;
+      height: 400px;
+      background: #f0f0f0;
+      border: 1px solid #999;
+      margin: 0 2px;
+      display: flex;
+      flex-direction: column;
+      justify-content: flex-end;
+    }
+    .block {
+      width: 58px;
+      height: 38px;
+      background: #ffeb3b;
+      margin: 1px auto;
+      line-height: 38px;
+      text-align: center;
+      font-size: 20px;
+      cursor: grab;
+    }
+    #spawn { margin-top: 20px; height: 60px; }
+    #message { margin-top: 20px; font-size: 24px; }
+    #controls button { margin: 0 10px; font-size: 16px; }
+    .trophy { font-size: 48px; vertical-align: middle; }
+  </style>
+</head>
+<body>
+  <h1>成語俄羅斯方塊遊戲</h1>
+  <div id="score">Score: 0</div>
+  <div id="game">
+    <div id="grid">
+      <div class="column" data-col="0"></div>
+      <div class="column" data-col="1"></div>
+      <div class="column" data-col="2"></div>
+      <div class="column" data-col="3"></div>
+    </div>
+  </div>
+  <div id="spawn"></div>
+  <div id="message"></div>
+  <div id="controls"></div>  <script>
+    const idioms = [
+      '塞翁失馬','掩耳盜鈴','畫蛇添足','刻舟求劍','對牛彈琴',
+      '井底之蛙','亡羊補牢','自相矛盾','錦上添花','畫龍點睛',
+      '滄海一粟','杯弓蛇影','坐井觀天','指鹿為馬','入木三分',
+      '盲人摸象','刻骨銘心','背水一戰','一箭雙鵰','風聲鶴唳'
+    ];
+    const maxRows = 10;
+    const maxScore = 20;
+    let score = 0;
+    let currentWord = '';
+    let shuffled = [];
+    let charIndex = 0;
+
+    const spawn = document.getElementById('spawn');
+    const scoreEl = document.getElementById('score');
+    const messageEl = document.getElementById('message');
+    const controlsEl = document.getElementById('controls');
+    const columns = Array.from(document.querySelectorAll('.column'));
+
+    function updateScore() {
+      scoreEl.textContent = `Score: ${score}`;
+    }
+
+    function win() {
+      messageEl.innerHTML = '恭喜你取得滿分 <span class="trophy">🏆</span>';
+      showRestart();
+    }
+
+    function gameOver() {
+      messageEl.textContent = '遊戲結束！';
+      showRestart();
+    }
+
+    function showRestart() {
+      spawn.innerHTML = '';
+      controlsEl.innerHTML = '';
+      ['重新開始','結束遊戲'].forEach(text => {
+        const btn = document.createElement('button');
+        btn.textContent = text;
+        btn.addEventListener('click', () => {
+          if (text === '重新開始') restart();
+          else window.location.reload();
+        });
+        controlsEl.appendChild(btn);
+      });
+    }
+
+    function restart() {
+      // reset state
+      score = 0;
+      updateScore();
+      messageEl.textContent = '';
+      controlsEl.innerHTML = '';
+      columns.forEach(col => col.innerHTML = '');
+      charIndex = 0;
+      spawnNext();
+    }
+
+    function spawnNext() {
+      if (charIndex === 0) {
+        currentWord = idioms[Math.floor(Math.random() * idioms.length)];
+        shuffled = currentWord.split('').sort(() => Math.random() - 0.5);
+      }
+      if (charIndex >= shuffled.length) {
+        charIndex = 0;
+        spawnNext();
+        return;
+      }
+      const char = shuffled[charIndex++];
+      const block = document.createElement('div');
+      block.className = 'block';
+      const id = 'block-' + Date.now() + '-' + charIndex;
+      block.id = id;
+      block.textContent = char;
+      block.draggable = true;
+      block.addEventListener('dragstart', e => {
+        e.dataTransfer.setData('text/plain', id);
+      });
+      spawn.innerHTML = '';
+      spawn.appendChild(block);
+    }
+
+    columns.forEach(col => {
+      col.addEventListener('dragover', e => e.preventDefault());
+      col.addEventListener('drop', e => {
+        const id = e.dataTransfer.getData('text/plain');
+        const block = document.getElementById(id);
+        if (block) {
+          col.appendChild(block);
+          block.draggable = false;
+          checkRows();
+          if (score < maxScore && !messageEl.textContent) spawnNext();
+        }
+      });
+    });
+
+    function checkRows() {
+      for (let i = 1; i <= maxRows; i++) {
+        if (columns.every(col => col.children.length >= i)) {
+          const chars = columns.map(col => col.children[col.children.length - i].textContent);
+          const guess = chars.join('');
+          if (idioms.includes(guess)) {
+            columns.forEach(col => {
+              const toRemove = col.children[col.children.length - i];
+              col.removeChild(toRemove);
+            });
+            score++;
+            updateScore();
+            if (score >= maxScore) {
+              win();
+            }
+            return;
+          }
+        }
+      }
+      if (columns.some(col => col.children.length > maxRows)) {
+        gameOver();
+      }
+    }
+
+    // start game
+    updateScore();
+    spawnNext();
+  </script></body>
+</html>
