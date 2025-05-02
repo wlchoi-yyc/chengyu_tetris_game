@@ -1,131 +1,332 @@
 <!DOCTYPE html><html lang="zh-Hant">
 <head>
-<meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no" />
-<title>成語方塊遊戲</title>
-<style>
- :root{
-  --board-bg:#111;
-  --cell-size:40px;
-  --block-bg:#f0c040;
-  --block-color:#000;
-  --slot-bg:#444;
- }
- *{box-sizing:border-box;margin:0;padding:0;font-family:"Noto Sans TC",sans-serif;-webkit-user-select:none;user-select:none}
- body{display:flex;justify-content:center;align-items:center;height:100vh;background:#222;color:#fff;overflow:hidden}
- #game{display:flex;flex-direction:column;align-items:center;position:relative}
- #board{position:relative;background:var(--board-bg);touch-action:none}
- .block{position:absolute;width:var(--cell-size);height:var(--cell-size);background:var(--block-bg);border-radius:4px;display:flex;justify-content:center;align-items:center;font-weight:700;font-size:calc(var(--cell-size)*0.6);color:var(--block-color);cursor:grab;touch-action:none;transition:box-shadow .1s}
- .block.selected{box-shadow:0 0 0 3px #00eaff inset,0 0 6px #00eaff}
- #slots{display:flex;gap:4px;margin-top:4px}
- .slot{width:var(--cell-size);height:var(--cell-size);background:var(--slot-bg);border:2px dashed #888;border-radius:4px;display:flex;justify-content:center;align-items:center}
- .slot.flash{animation:flash .6s}
- @keyframes flash{0%,50%{border-color:#ff4040;}100%{border-color:#888;}}
- #score{margin-top:8px;font-size:1.2rem}
- #overlay{position:absolute;inset:0;background:rgba(0,0,0,.8);display:flex;flex-direction:column;justify-content:center;align-items:center;gap:20px;backdrop-filter:blur(4px);z-index:50}
- #overlay.hidden{display:none}
- #overlay button{padding:10px 24px;font-size:1.1rem;border:none;border-radius:6px;background:#f0c040;color:#000;cursor:pointer}
-</style>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>成語俄羅斯方塊遊戲</title>
+  <script src="https://cdn.jsdelivr.net/npm/interactjs/dist/interact.min.js"></script>
+  <style>
+    * {
+      box-sizing: border-box;
+    }
+    body {
+      margin: 0;
+      font-family: "Noto Sans TC", sans-serif;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: flex-start;
+      background: #f0f4f8;
+      height: 100vh;
+      overflow: hidden;
+      user-select: none;
+      -webkit-user-select: none;
+    }
+    #scoreBoard {
+      margin-top: 0.5rem;
+      font-size: 1.2rem;
+      font-weight: 700;
+    }
+    #gameBoard {
+      position: relative;
+      width: 100%;
+      max-width: 480px;
+      height: 70vh;
+      background: #ffffff;
+      border: 3px solid #444;
+      overflow: hidden;
+      border-radius: 8px;
+    }
+    .block {
+      position: absolute;
+      width: 56px;
+      height: 56px;
+      background: #8bc34a;
+      color: #fff;
+      border: 2px solid #558b2f;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.5rem;
+      font-weight: 700;
+      border-radius: 4px;
+      touch-action: none;
+    }
+    .stacked {
+      background: #4caf50;
+    }
+    #slotContainer {
+      position: absolute;
+      bottom: 8px;
+      left: 50%;
+      transform: translateX(-50%);
+      display: flex;
+      gap: 6px;
+    }
+    .slot {
+      width: 56px;
+      height: 56px;
+      background: #e0e0e0;
+      border: 2px dashed #9e9e9e;
+      border-radius: 4px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.5rem;
+      font-weight: 700;
+    }
+    .slot.correct {
+      border-color: #4caf50;
+    }
+    .slot.incorrect {
+      border-color: #f44336;
+    }
+    #messageOverlay {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0, 0, 0, 0.75);
+      color: #fff;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.8rem;
+      font-weight: 700;
+      padding: 1rem;
+      text-align: center;
+      z-index: 5;
+      visibility: hidden;
+    }
+    #messageOverlay button {
+      margin-top: 1rem;
+      padding: 0.6rem 1.2rem;
+      font-size: 1rem;
+      border: none;
+      border-radius: 4px;
+      background: #ffeb3b;
+      font-weight: 700;
+      cursor: pointer;
+    }
+  </style>
 </head>
 <body>
- <div id="game">
-  <div id="board"></div>
-  <div id="slots"></div>
-  <div id="score">得分：0 / 20</div>
-  <div id="overlay" class="hidden">
-   <div id="message"></div>
-   <button id="restartBtn">重新開始</button>
-   <button id="endBtn">結束遊戲</button>
-  </div>
- </div>
-<script>
-(()=>{
- /* ======== 常量 ======== */
- const COLS=10,ROWS=18,TICK=450,ONSCREEN=6,MAX_SCORE=20;
- const idioms=["畫蛇添足","亡羊補牢","對牛彈琴","守株待兔","掩耳盜鈴","指鹿為馬","刻舟求劍","盲人摸象","井底之蛙","草木皆兵","紙上談兵","負荊請罪","自相矛盾","畫龍點睛","杯弓蛇影","四海為家","百發百中","一帆風順","順手牽羊","臥薪嘗膽"];
- const extraPool="甲乙丙丁戊己庚辛壬癸春夏秋冬東南西北高低大小前後天地玄黃宇宙洪荒青赤白黑金木水火土山川風雷電霞星辰日月雲霧花草樹木蟲鳥魚獸砂糖鹽醋茶酒米麵".split('').filter(ch=>!idioms.join('').includes(ch));
- /* ======== DOM ======== */
- const boardEl=document.getElementById('board');
- const slotsEl=document.getElementById('slots');
- const scoreEl=document.getElementById('score');
- const overlayEl=document.getElementById('overlay');
- const msgEl=document.getElementById('message');
- const restartBtn=document.getElementById('restartBtn');
- const endBtn=document.getElementById('endBtn');
- /* ======== 狀態 ======== */
- let cellSize,timer=null,score=0;
- const matrix=[];          // ROWS*COLS 2D
- const falling=[];         // 空中字塊
- const slots=[null,null,null,null];
- const completed=new Set();
- let queue=[];let batchId=0; // 當前批次
- let active=null;
- /* ======== 工具 ======== */
- const rand=a=>a[Math.floor(Math.random()*a.length)];
- const shuffle=a=>{const arr=[...a];for(let i=arr.length-1;i>0;i--){const j=Math.floor(Math.random()* (i+1));[arr[i],arr[j]]=[arr[j],arr[i]];}return arr};
- function resize(){cellSize=Math.floor(Math.min(window.innerWidth/(COLS+2),window.innerHeight/(ROWS+6)));document.documentElement.style.setProperty('--cell-size',cellSize+'px');boardEl.style.width=COLS*cellSize+'px';boardEl.style.height=ROWS*cellSize+'px';slotsEl.style.width=COLS*cellSize+'px';}
- window.addEventListener('resize',resize);resize();
- /* ======== 初始化 ======== */
- function initMatrix(){matrix.length=0;for(let r=0;r<ROWS;r++){matrix.push(Array(COLS).fill(null));}}
- function buildSlots(){slotsEl.innerHTML='';for(let i=0;i<4;i++){const d=document.createElement('div');d.className='slot';slotsEl.appendChild(d);} }
- buildSlots();
- const slotElems=[...slotsEl.children];
- /* ======== Block 函式 ======== */
- function createBlock(ch,bId){const el=document.createElement('div');el.className='block';el.textContent=ch;boardEl.parentElement.appendChild(el);return {ch,row:-1,col:0,slotIndex:null,batchId:bId,el};}
- function setPos(b){if(b.slotIndex!==null){const r=slotElems[b.slotIndex].getBoundingClientRect();const p=boardEl.parentElement.getBoundingClientRect();b.el.style.left=r.left-p.left+'px';b.el.style.top=r.top-p.top+'px';}
- else{b.el.style.left=b.col*cellSize+'px';b.el.style.top=b.row*cellSize+'px';}}
- function collision(r,c){return r>=ROWS||(r>=0&&matrix[r][c]);}
- /* ======== 產生批次 (4 正確 +2 干擾) ======== */
- function newBatch(){batchId++;const word=rand(idioms.filter(i=>!completed.has(i)));const extras=shuffle(extraPool).slice(0,2);queue=shuffle([...word.split(''),...extras]).map(ch=>({ch,batchId}));}
- function topEmptyCols(){return [...Array(COLS).keys()].filter(c=>!collision(0,c));}
- function spawnPiece(){if(queue.length===0)newBatch();const item=queue.pop();const cols=topEmptyCols();if(cols.length===0){gameOver();return;}const col=rand(cols);
- const b=createBlock(item.ch,item.batchId);b.col=col;setPos(b);makeDraggable(b);falling.push(b);} 
- /* ======== 拖曳 ======== */
- function select(b){if(active)active.el.classList.remove('selected');active=b;b.el.classList.add('selected');}
- function makeDraggable(block){const el=block.el;el.addEventListener('pointerdown',e=>{e.preventDefault();select(block);
- if(block.slotIndex!==null){slots[block.slotIndex]=null;block.slotIndex=null;}
- const parent=boardEl.parentElement.getBoundingClientRect();const rect=el.getBoundingClientRect();const offsetX=e.clientX-rect.left,offsetY=e.clientY-rect.top;el.setPointerCapture(e.pointerId);
- const move=ev=>{el.style.left=ev.clientX-offsetX-parent.left+'px';el.style.top=ev.clientY-offsetY-parent.top+'px';};
- const up=ev=>{el.releasePointerCapture(ev.pointerId);document.removeEventListener('pointermove',move);document.removeEventListener('pointerup',up);
- let placed=false;
- slotElems.forEach((sEl,idx)=>{const r=sEl.getBoundingClientRect();if(ev.clientX>r.left&&ev.clientX<r.right&&ev.clientY>r.top&&ev.clientY<r.bottom&&!slots[idx]){slots[idx]=block;block.slotIndex=idx;placed=true;setPos(block);} });
- if(!placed){const bRect=boardEl.getBoundingClientRect();const c=Math.floor((ev.clientX-bRect.left)/cellSize);const r=Math.floor((ev.clientY-bRect.top)/cellSize);
- if(c>=0&&c<COLS&&r>=0&&r<ROWS&&!collision(r,c)){block.col=c;block.row=r;setPos(block);matrix[r][c]=block;}else{setPos(block);} }
- checkSlots();};
- document.addEventListener('pointermove',move);document.addEventListener('pointerup',up);});}
- /* ======== 插槽檢查 ======== */
- function clearSlots(){slots.fill(null);}
- function flashSlots(){slotElems.forEach(el=>{el.classList.add('flash');setTimeout(()=>el.classList.remove('flash'),600);});}
- function checkSlots(){if(slots.every(Boolean)){
-   const word=slots.map(b=>b.ch).join('');if(idioms.includes(word)){
-     const bid=slots[0].batchId;
-     document.querySelectorAll('.block').forEach(el=>{const b=getBlockByEl(el);if(b&&b.batchId===bid){if(matrix[b.row]&&matrix[b.row][b.col]===b)matrix[b.row][b.col]=null;b.el.remove();falling.splice(falling.indexOf(b),1);} });
-     completed.add(word);score++;updateScore();clearSlots();applyGravity();
-   }else{flashSlots();}
- }}
- function getBlockByEl(el){return falling.find(b=>b.el===el)||matrix.flat().find(b=>b&&b.el===el)||slots.find(b=>b&&b.el===el);} 
- /* ======== 重力迴圈 ======== */
- function applyGravity(){for(let c=0;c<COLS;c++){for(let r=ROWS-2;r>=0;r--){if(matrix[r][c]&&!matrix[r+1][c]){let nr=r;while(!collision(nr+1,c))nr++;const blk=matrix[r][c];matrix[r][c]=null;matrix[nr][c]=blk;blk.row=nr;setPos(blk);} }} }
- function tick(){
- // move falling blocks down
- for(let i=falling.length-1;i>=0;i--){const b=falling[i];if(b.slotIndex!==null)continue;const nr=b.row+1;if(!collision(nr,b.col)){b.row=nr;setPos(b);}else{if(b.row<0){gameOver();return;}matrix[b.row][b.col]=b;falling.splice(i,1);} }
- // add more blocks
- while(falling.filter(b=>b.slotIndex===null).length<ONSCREEN)spawnPiece();
- // game over if top row occupied across all columns
- if(matrix[0].some(cell=>cell)){gameOver();}
- if(score>=MAX_SCORE)win();}
- /* ======== UI ======== */
- function updateScore(){scoreEl.textContent=`得分：${score} / ${MAX_SCORE}`;}
- /* ======== 流程控制 ======== */
- function stop(){clearInterval(timer);timer=null;}
- function win(){stop();msgEl.innerHTML='🏆<br>恭喜你取得滿分！';overlayEl.classList.remove('hidden');}
- function gameOver(){stop();msgEl.innerHTML='Game Over!<br>謝謝參與！';overlayEl.classList.remove('hidden');}
- function reset(){document.querySelectorAll('.block').forEach(el=>el.remove());falling.length=0;queue.length=0;completed.clear();score=0;updateScore();clearSlots();initMatrix();active=null;}
- function start(){overlayEl.classList.add('hidden');reset();while(falling.length<ONSCREEN)spawnPiece();timer=setInterval(tick,TICK);} 
- restartBtn.onclick=start;endBtn.onclick=()=>overlayEl.classList.remove('hidden');
- /* ======== 啟動 ======== */
- start();
-})();
-</script>
-</body>
+  <div id="scoreBoard">分數：0 / 20</div>
+  <div id="gameBoard">
+    <div id="slotContainer">
+      <div class="slot" data-index="0"></div>
+      <div class="slot" data-index="1"></div>
+      <div class="slot" data-index="2"></div>
+      <div class="slot" data-index="3"></div>
+    </div>
+    <div id="messageOverlay"></div>
+  </div>  <script>
+    // Idioms and distractor chars
+    const idioms = [
+      "一竅不通", "不恥下問", "茅塞頓開", "發人深省", "今非昔比", "老生常談", "拋磚引玉", "拾人牙慧",
+      "語無倫次", "強詞奪理", "一片冰心", "大義凜然", "出爾反爾", "守正不阿", "古道熱腸", "坐懷不亂",
+      "道不拾遺", "見義勇為", "涓滴歸公", "飲水思源"
+    ];
+
+    const distractorPool = "天地玄黃宇宙洪荒日月盈昃辰宿列張寒來暑往秋收冬藏閏餘成歲律呂調陽雲騰致雨露結為霜".split("");
+
+    const board = document.getElementById("gameBoard");
+    const scoreBoard = document.getElementById("scoreBoard");
+    const overlay = document.getElementById("messageOverlay");
+    const slotContainer = document.getElementById("slotContainer");
+    const slots = [...document.querySelectorAll(".slot")];
+
+    let score = 0;
+    let usedIdioms = new Set();
+    let activeBlocks = [];
+    let gameIntervals = [];
+
+    // Helpers
+    function rand(min, max) {
+      return Math.floor(Math.random() * (max - min + 1)) + min;
+    }
+
+    function shuffle(arr) {
+      for (let i = arr.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [arr[i], arr[j]] = [arr[j], arr[i]];
+      }
+      return arr;
+    }
+
+    function resetSlots() {
+      slots.forEach((slot) => {
+        slot.textContent = "";
+        slot.dataset.char = "";
+        slot.classList.remove("correct", "incorrect");
+      });
+    }
+
+    function updateScore() {
+      scoreBoard.textContent = `分數：${score} / 20`;
+    }
+
+    function endGame(message) {
+      clearAllIntervals();
+      overlay.innerHTML = `${message}<br />`;
+      const btnGroup = document.createElement("div");
+      const restartBtn = document.createElement("button");
+      restartBtn.textContent = "重新開始";
+      restartBtn.onclick = () => location.reload();
+      const exitBtn = document.createElement("button");
+      exitBtn.textContent = "結束遊戲";
+      exitBtn.onclick = () => window.close();
+      btnGroup.appendChild(restartBtn);
+      btnGroup.appendChild(exitBtn);
+      overlay.appendChild(btnGroup);
+      overlay.style.visibility = "visible";
+    }
+
+    function clearAllIntervals() {
+      gameIntervals.forEach((id) => clearInterval(id));
+      gameIntervals = [];
+    }
+
+    // Collision detection for stacking
+    function willCollide(block) {
+      const nextY = block.offsetTop + 2; // fall speed
+      if (nextY + block.offsetHeight >= board.offsetHeight - slotContainer.offsetHeight) return true;
+      return Array.from(board.children).some((el) => {
+        if (!el.classList.contains("block") || el === block || !el.classList.contains("stacked")) return false;
+        const rect1 = block.getBoundingClientRect();
+        const rect2 = el.getBoundingClientRect();
+        return (
+          rect1.left < rect2.right &&
+          rect1.right > rect2.left &&
+          rect1.bottom + 2 >= rect2.top &&
+          rect1.bottom <= rect2.top + 6
+        );
+      });
+    }
+
+    function spawnBlocks() {
+      if (usedIdioms.size === idioms.length) usedIdioms.clear();
+      let idiom;
+      do {
+        idiom = idioms[rand(0, idioms.length - 1)];
+      } while (usedIdioms.has(idiom));
+      usedIdioms.add(idiom);
+
+      const chars = idiom.split("");
+      const distractors = [];
+      while (distractors.length < 2) {
+        const c = distractorPool[rand(0, distractorPool.length - 1)];
+        if (!chars.includes(c) && distractors.indexOf(c) === -1) distractors.push(c);
+      }
+
+      const allChars = shuffle([...chars, ...distractors]);
+
+      allChars.forEach((char) => {
+        const block = document.createElement("div");
+        block.className = "block";
+        block.textContent = char;
+        block.dataset.char = char;
+        block.style.left = `${rand(0, board.offsetWidth - 56)}px`;
+        block.style.top = "-60px";
+        board.appendChild(block);
+        activeBlocks.push(block);
+        fall(block);
+        makeDraggable(block);
+      });
+    }
+
+    function fall(block) {
+      const intervalId = setInterval(() => {
+        if (!block.isDragging) {
+          if (!willCollide(block)) {
+            block.style.top = `${block.offsetTop + 2}px`;
+          } else {
+            block.classList.add("stacked");
+            clearInterval(intervalId);
+            gameIntervals = gameIntervals.filter((id) => id !== intervalId);
+            checkGameOver();
+            // Remove reference from activeBlocks
+            activeBlocks = activeBlocks.filter((b) => b !== block);
+          }
+        }
+      }, 16);
+      gameIntervals.push(intervalId);
+    }
+
+    function checkGameOver() {
+      const stacked = [...board.querySelectorAll(".block.stacked")];
+      if (stacked.some((b) => b.offsetTop < 0)) {
+        endGame("Game Over! 字塊堆疊到頂\uD83D\uDE1E");
+      } else if (stacked.length > 200) {
+        // Fallback safety limit
+        endGame("Game Over! 字塊過多\uD83D\uDE1E");
+      }
+    }
+
+    function makeDraggable(element) {
+      interact(element)
+        .draggable({
+          listeners: {
+            start() {
+              element.isDragging = true;
+            },
+            move(event) {
+              const x = (parseFloat(element.getAttribute("data-x")) || 0) + event.dx;
+              const y = (parseFloat(element.getAttribute("data-y")) || 0) + event.dy;
+              element.style.transform = `translate(${x}px, ${y}px)`;
+              element.setAttribute("data-x", x);
+              element.setAttribute("data-y", y);
+            },
+            end() {
+              element.isDragging = false;
+            },
+          },
+          inertia: true,
+        });
+    }
+
+    // Dropzones for slots
+    interact(".slot").dropzone({
+      accept: ".block",
+      overlap: 0.55,
+      ondropactivate(event) {
+        event.target.classList.remove("correct", "incorrect");
+      },
+      ondrop(event) {
+        const slot = event.target;
+        if (slot.dataset.char) return; // already filled
+        const block = event.relatedTarget;
+        slot.textContent = block.dataset.char;
+        slot.dataset.char = block.dataset.char;
+        block.remove();
+        checkSlots();
+      },
+    });
+
+    function checkSlots() {
+      const chars = slots.map((s) => s.dataset.char || "").join("");
+      if (chars.length === 4) {
+        if (idioms.includes(chars)) {
+          slots.forEach((s) => s.classList.add("correct"));
+          setTimeout(() => {
+            resetSlots();
+            score += 1;
+            updateScore();
+            if (score >= 20) {
+              endGame("\uD83C\uDFC6 恭喜你取得滿分！\uD83C\uDFC6");
+            } else {
+              spawnBlocks();
+            }
+          }, 600);
+        } else {
+          slots.forEach((s) => s.classList.add("incorrect"));
+        }
+      }
+    }
+
+    // Start game
+    updateScore();
+    spawnBlocks();
+  </script></body>
 </html>
