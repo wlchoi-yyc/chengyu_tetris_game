@@ -47,6 +47,7 @@
   <div id="spawn"></div>
   <div id="message"></div>
   <div id="controls"></div>  <script>
+    // 成語列表
     const idioms = [
       '塞翁失馬','掩耳盜鈴','畫蛇添足','刻舟求劍','對牛彈琴',
       '井底之蛙','亡羊補牢','自相矛盾','錦上添花','畫龍點睛',
@@ -55,10 +56,12 @@
     ];
     const maxRows = 10;
     const maxScore = 20;
+
     let score = 0;
     let currentWord = '';
     let shuffled = [];
     let charIndex = 0;
+    let currentBlock = null;
 
     const spawn = document.getElementById('spawn');
     const scoreEl = document.getElementById('score');
@@ -95,16 +98,17 @@
     }
 
     function restart() {
-      // reset state
       score = 0;
       updateScore();
       messageEl.textContent = '';
       controlsEl.innerHTML = '';
       columns.forEach(col => col.innerHTML = '');
       charIndex = 0;
+      currentBlock = null;
       spawnNext();
     }
 
+    // 生成下一個文字方塊
     function spawnNext() {
       if (charIndex === 0) {
         currentWord = idioms[Math.floor(Math.random() * idioms.length)];
@@ -118,31 +122,49 @@
       const char = shuffled[charIndex++];
       const block = document.createElement('div');
       block.className = 'block';
-      const id = 'block-' + Date.now() + '-' + charIndex;
-      block.id = id;
       block.textContent = char;
       block.draggable = true;
+      block.id = 'block-' + Date.now() + '-' + charIndex;
+      // 拖動
       block.addEventListener('dragstart', e => {
-        e.dataTransfer.setData('text/plain', id);
+        e.dataTransfer.setData('text/plain', block.id);
       });
+      currentBlock = block;
       spawn.innerHTML = '';
       spawn.appendChild(block);
     }
 
-    columns.forEach(col => {
+    // 將方塊放入指定欄位的通用函式
+    function dropBlockToColumn(colIndex) {
+      if (!currentBlock) return;
+      const col = columns[colIndex];
+      col.appendChild(currentBlock);
+      currentBlock.draggable = false;
+      currentBlock = null;
+      checkRows();
+      if (score < maxScore && !messageEl.textContent) spawnNext();
+    }
+
+    // 監聽拖放與點擊事件
+    columns.forEach((col, index) => {
       col.addEventListener('dragover', e => e.preventDefault());
       col.addEventListener('drop', e => {
+        e.preventDefault();
         const id = e.dataTransfer.getData('text/plain');
         const block = document.getElementById(id);
         if (block) {
           col.appendChild(block);
           block.draggable = false;
+          currentBlock = null;
           checkRows();
           if (score < maxScore && !messageEl.textContent) spawnNext();
         }
       });
+      // 支援行動裝置點擊放置
+      col.addEventListener('click', () => dropBlockToColumn(index));
     });
 
+    // 檢查是否湊成完整成語或堆疊超過頂部
     function checkRows() {
       for (let i = 1; i <= maxRows; i++) {
         if (columns.every(col => col.children.length >= i)) {
@@ -155,19 +177,15 @@
             });
             score++;
             updateScore();
-            if (score >= maxScore) {
-              win();
-            }
+            if (score >= maxScore) win();
             return;
           }
         }
       }
-      if (columns.some(col => col.children.length > maxRows)) {
-        gameOver();
-      }
+      if (columns.some(col => col.children.length > maxRows)) gameOver();
     }
 
-    // start game
+    // 啟動遊戲
     updateScore();
     spawnNext();
   </script></body>
