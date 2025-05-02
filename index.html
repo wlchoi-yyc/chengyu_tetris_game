@@ -1,192 +1,304 @@
 <!DOCTYPE html><html lang="zh-Hant">
 <head>
-  <meta charset="UTF-8">
-  <title>成語俄羅斯方塊遊戲</title>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1.0,user-scalable=no" />
+  <title>成語俄羅斯方塊</title>
   <style>
-    body { font-family: sans-serif; text-align: center; margin: 20px; }
-    #score { font-size: 20px; margin-bottom: 10px; }
-    #game { display: inline-block; }
-    #grid { display: flex; }
-    .column {
-      width: 60px;
-      height: 400px;
-      background: #f0f0f0;
-      border: 1px solid #999;
-      margin: 0 2px;
-      display: flex;
-      flex-direction: column;
-      justify-content: flex-end;
+    :root {
+      --board-bg: #111;
+      --cell-size: 40px; /* 會在腳本中根據視窗動態覆寫 */
+      --block-bg: #f0c040;
+      --block-color: #000;
     }
-    .block {
-      width: 58px;
-      height: 38px;
-      background: #ffeb3b;
-      margin: 1px auto;
-      line-height: 38px;
-      text-align: center;
-      font-size: 20px;
-      cursor: grab;
-    }
-    #spawn { margin-top: 20px; height: 60px; }
-    #message { margin-top: 20px; font-size: 24px; }
-    #controls button { margin: 0 10px; font-size: 16px; }
-    .trophy { font-size: 48px; vertical-align: middle; }
+    *{box-sizing:border-box;margin:0;padding:0;font-family:"Noto Sans TC",sans-serif;user-select:none;-webkit-user-select:none;touch-action:none}
+    body{display:flex;justify-content:center;align-items:center;height:100vh;background:#222;color:#fff;overflow:hidden}
+    #game{position:relative}
+    #board{position:relative;background:var(--board-bg);touch-action:none}
+    .block{position:absolute;width:var(--cell-size);height:var(--cell-size);background:var(--block-bg);border-radius:4px;display:flex;justify-content:center;align-items:center;font-size:calc(var(--cell-size)*0.6);font-weight:bold;color:var(--block-color);box-shadow:0 0 4px rgba(0,0,0,.5)}
+    #score{margin-top:8px;text-align:center;font-size:1.2rem}
+    #overlay{position:absolute;inset:0;background:rgba(0,0,0,.8);display:flex;flex-direction:column;justify-content:center;align-items:center;gap:16px;z-index:10;backdrop-filter:blur(4px)}
+    #overlay.hidden{display:none}
+    #message{font-size:1.5rem;text-align:center;line-height:1.4}
+    button{padding:8px 16px;font-size:1rem;border:none;border-radius:6px;cursor:pointer;background:#f0c040;color:#000}
+    .ctrls{margin-top:12px;display:flex;justify-content:center;gap:12px}
   </style>
 </head>
 <body>
-  <h1>成語俄羅斯方塊遊戲</h1>
-  <div id="score">Score: 0</div>
   <div id="game">
-    <div id="grid">
-      <div class="column" data-col="0"></div>
-      <div class="column" data-col="1"></div>
-      <div class="column" data-col="2"></div>
-      <div class="column" data-col="3"></div>
+    <div id="board"></div>
+    <div id="score">得分：0 / 20</div>
+    <div class="ctrls">
+      <button id="leftBtn">◀︎</button>
+      <button id="downBtn">▼</button>
+      <button id="rightBtn">▶︎</button>
     </div>
-  </div>
-  <div id="spawn"></div>
-  <div id="message"></div>
-  <div id="controls"></div>  <script>
-    // 成語列表
-    const idioms = [
-      '塞翁失馬','掩耳盜鈴','畫蛇添足','刻舟求劍','對牛彈琴',
-      '井底之蛙','亡羊補牢','自相矛盾','錦上添花','畫龍點睛',
-      '滄海一粟','杯弓蛇影','坐井觀天','指鹿為馬','入木三分',
-      '盲人摸象','刻骨銘心','背水一戰','一箭雙鵰','風聲鶴唳'
-    ];
-    const maxRows = 10;
-    const maxScore = 20;
+    <div id="overlay" class="hidden">
+      <div id="message"></div>
+      <button id="restartBtn">重新開始</button>
+      <button id="endBtn">結束遊戲</button>
+    </div>
+  </div><script>
+(() => {
+  /* ========= 遊戲設定 ========= */
+  const COLS = 10;
+  const ROWS = 20;
+  const TICK_MS = 500; // 下落速度
+  const MAX_SCORE = 20;
+  const idioms = [
+    "畫蛇添足","亡羊補牢","對牛彈琴","守株待兔","掩耳盜鈴","指鹿為馬",
+    "刻舟求劍","盲人摸象","井底之蛙","草木皆兵","紙上談兵","負荊請罪",
+    "自相矛盾","畫龍點睛","杯弓蛇影","四海為家","百發百中","一帆風順",
+    "順手牽羊","臥薪嘗膽"
+  ];
+  const boardEl = document.getElementById('board');
+  const scoreEl = document.getElementById('score');
+  const overlayEl = document.getElementById('overlay');
+  const msgEl = document.getElementById('message');
+  const restartBtn = document.getElementById('restartBtn');
+  const endBtn = document.getElementById('endBtn');
+  const leftBtn = document.getElementById('leftBtn');
+  const rightBtn = document.getElementById('rightBtn');
+  const downBtn = document.getElementById('downBtn');
 
-    let score = 0;
-    let currentWord = '';
-    let shuffled = [];
-    let charIndex = 0;
-    let currentBlock = null;
+  let cellSize;
+  let matrix;
+  let falling = null;
+  let timer = null;
+  let score = 0;
+  const completed = new Set();
+  let charQueue = [];
 
-    const spawn = document.getElementById('spawn');
-    const scoreEl = document.getElementById('score');
-    const messageEl = document.getElementById('message');
-    const controlsEl = document.getElementById('controls');
-    const columns = Array.from(document.querySelectorAll('.column'));
+  function resize() {
+    cellSize = Math.floor(Math.min(window.innerWidth / (COLS + 2), window.innerHeight / (ROWS + 4)));
+    document.documentElement.style.setProperty('--cell-size', cellSize + 'px');
+    boardEl.style.width = `${COLS * cellSize}px`;
+    boardEl.style.height = `${ROWS * cellSize}px`;
+  }
 
-    function updateScore() {
-      scoreEl.textContent = `Score: ${score}`;
+  window.addEventListener('resize', resize);
+  resize();
+
+  /* ========= 工具 ========= */
+  const rand = arr => arr[Math.floor(Math.random() * arr.length)];
+  function shuffle(arr) {
+    const a = [...arr];
+    for (let i = a.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [a[i], a[j]] = [a[j], a[i]];
     }
+    return a;
+  }
 
-    function win() {
-      messageEl.innerHTML = '恭喜你取得滿分 <span class="trophy">🏆</span>';
-      showRestart();
+  /* ========= 遊戲邏輯 ========= */
+  function initMatrix() {
+    matrix = Array.from({ length: ROWS }, () => Array(COLS).fill(null));
+  }
+
+  function createBlock(char) {
+    const el = document.createElement('div');
+    el.className = 'block';
+    el.textContent = char;
+    boardEl.appendChild(el);
+    return el;
+  }
+
+  function spawnPiece() {
+    if (charQueue.length === 0) {
+      const remaining = idioms.filter(i => !completed.has(i));
+      if (remaining.length === 0) return; // 已完成所有
+      charQueue = shuffle(remaining[0].split(''));
     }
-
-    function gameOver() {
-      messageEl.textContent = '遊戲結束！';
-      showRestart();
+    const ch = charQueue.pop();
+    const col = Math.floor(COLS / 2);
+    const row = -1; // 從版面外開始
+    const el = createBlock(ch);
+    falling = { ch, row, col, el };
+    positionEl(el, row, col);
+    makeDraggable(falling);
+    if (collision(row + 1, col)) {
+      gameOver();
     }
+  }
 
-    function showRestart() {
-      spawn.innerHTML = '';
-      controlsEl.innerHTML = '';
-      ['重新開始','結束遊戲'].forEach(text => {
-        const btn = document.createElement('button');
-        btn.textContent = text;
-        btn.addEventListener('click', () => {
-          if (text === '重新開始') restart();
-          else window.location.reload();
-        });
-        controlsEl.appendChild(btn);
-      });
+  function positionEl(el, row, col) {
+    el.style.top = `${row * cellSize}px`;
+    el.style.left = `${col * cellSize}px`;
+  }
+
+  function collision(newRow, col) {
+    return newRow >= ROWS || (newRow >=0 && matrix[newRow][col]);
+  }
+
+  function lockPiece() {
+    const r = falling.row;
+    const c = falling.col;
+    if (r >= 0) {
+      matrix[r][c] = falling;
+    } else {
+      gameOver();
+      return;
     }
+    falling = null;
+    clearLines();
+    spawnPiece();
+  }
 
-    function restart() {
-      score = 0;
-      updateScore();
-      messageEl.textContent = '';
-      controlsEl.innerHTML = '';
-      columns.forEach(col => col.innerHTML = '');
-      charIndex = 0;
-      currentBlock = null;
-      spawnNext();
-    }
-
-    // 生成下一個文字方塊
-    function spawnNext() {
-      if (charIndex === 0) {
-        currentWord = idioms[Math.floor(Math.random() * idioms.length)];
-        shuffled = currentWord.split('').sort(() => Math.random() - 0.5);
-      }
-      if (charIndex >= shuffled.length) {
-        charIndex = 0;
-        spawnNext();
-        return;
-      }
-      const char = shuffled[charIndex++];
-      const block = document.createElement('div');
-      block.className = 'block';
-      block.textContent = char;
-      block.draggable = true;
-      block.id = 'block-' + Date.now() + '-' + charIndex;
-      // 拖動
-      block.addEventListener('dragstart', e => {
-        e.dataTransfer.setData('text/plain', block.id);
-      });
-      currentBlock = block;
-      spawn.innerHTML = '';
-      spawn.appendChild(block);
-    }
-
-    // 將方塊放入指定欄位的通用函式
-    function dropBlockToColumn(colIndex) {
-      if (!currentBlock) return;
-      const col = columns[colIndex];
-      col.appendChild(currentBlock);
-      currentBlock.draggable = false;
-      currentBlock = null;
-      checkRows();
-      if (score < maxScore && !messageEl.textContent) spawnNext();
-    }
-
-    // 監聽拖放與點擊事件
-    columns.forEach((col, index) => {
-      col.addEventListener('dragover', e => e.preventDefault());
-      col.addEventListener('drop', e => {
-        e.preventDefault();
-        const id = e.dataTransfer.getData('text/plain');
-        const block = document.getElementById(id);
-        if (block) {
-          col.appendChild(block);
-          block.draggable = false;
-          currentBlock = null;
-          checkRows();
-          if (score < maxScore && !messageEl.textContent) spawnNext();
-        }
-      });
-      // 支援行動裝置點擊放置
-      col.addEventListener('click', () => dropBlockToColumn(index));
-    });
-
-    // 檢查是否湊成完整成語或堆疊超過頂部
-    function checkRows() {
-      for (let i = 1; i <= maxRows; i++) {
-        if (columns.every(col => col.children.length >= i)) {
-          const chars = columns.map(col => col.children[col.children.length - i].textContent);
-          const guess = chars.join('');
-          if (idioms.includes(guess)) {
-            columns.forEach(col => {
-              const toRemove = col.children[col.children.length - i];
-              col.removeChild(toRemove);
+  function clearLines() {
+    let anyCleared = false;
+    for (let r = 0; r < ROWS; r++) {
+      for (let c = 0; c <= COLS - 4; c++) {
+        const cells = [matrix[r][c], matrix[r][c + 1], matrix[r][c + 2], matrix[r][c + 3]];
+        if (cells.every(cell => cell)) {
+          const word = cells.map(cell => cell.ch).join('');
+          if (idioms.includes(word) && !completed.has(word)) {
+            // 清除此四格
+            cells.forEach(cell => {
+              boardEl.removeChild(cell.el);
+              matrix[cell.row][cell.col] = null;
             });
+            completed.add(word);
             score++;
             updateScore();
-            if (score >= maxScore) win();
-            return;
+            anyCleared = true;
           }
         }
       }
-      if (columns.some(col => col.children.length > maxRows)) gameOver();
     }
+    if (anyCleared) {
+      applyGravity();
+      if (score >= MAX_SCORE) {
+        win();
+      }
+    }
+  }
 
-    // 啟動遊戲
+  function applyGravity() {
+    for (let c = 0; c < COLS; c++) {
+      for (let r = ROWS - 2; r >= 0; r--) {
+        if (matrix[r][c]) {
+          let nr = r;
+          while (!collision(nr + 1, c)) nr++;
+          if (nr !== r) {
+            const blk = matrix[r][c];
+            matrix[r][c] = null;
+            matrix[nr][c] = blk;
+            blk.row = nr;
+            blk.col = c;
+            positionEl(blk.el, nr, c);
+          }
+        }
+      }
+    }
+  }
+
+  function updateScore() {
+    scoreEl.textContent = `得分：${score} / ${MAX_SCORE}`;
+  }
+
+  function tick() {
+    if (!falling) return;
+    const newRow = falling.row + 1;
+    if (!collision(newRow, falling.col)) {
+      falling.row = newRow;
+      positionEl(falling.el, falling.row, falling.col);
+    } else {
+      lockPiece();
+    }
+  }
+
+  /* ========= 拖拉事件 ========= */
+  function makeDraggable(piece) {
+    let startX = 0;
+    let startCol = 0;
+    const el = piece.el;
+    el.onpointerdown = e => {
+      e.preventDefault();
+      startX = e.clientX;
+      startCol = piece.col;
+      el.setPointerCapture(e.pointerId);
+    };
+    el.onpointermove = e => {
+      if (e.pressure === 0) return; // 未按下
+      const dx = e.clientX - startX;
+      const colOffset = Math.round(dx / cellSize);
+      const targetCol = Math.min(Math.max(startCol + colOffset, 0), COLS - 1);
+      if (!collision(piece.row, targetCol)) {
+        piece.col = targetCol;
+        positionEl(el, piece.row, piece.col);
+      }
+    };
+    el.onpointerup = e => {
+      el.releasePointerCapture(e.pointerId);
+    };
+  }
+
+  /* ========= 鍵盤與按鈕控制 ========= */
+  function move(deltaCol) {
+    if (!falling) return;
+    const target = Math.min(Math.max(falling.col + deltaCol, 0), COLS - 1);
+    if (!collision(falling.row, target)) {
+      falling.col = target;
+      positionEl(falling.el, falling.row, falling.col);
+    }
+  }
+  function softDrop() {
+    if (!falling) return;
+    while (!collision(falling.row + 1, falling.col)) {
+      falling.row++;
+    }
+    positionEl(falling.el, falling.row, falling.col);
+    lockPiece();
+  }
+
+  document.addEventListener('keydown', e => {
+    if (overlayEl.classList.contains('hidden')) {
+      if (e.key === 'ArrowLeft') move(-1);
+      else if (e.key === 'ArrowRight') move(1);
+      else if (e.key === 'ArrowDown') softDrop();
+    }
+  });
+  leftBtn.addEventListener('click', () => move(-1));
+  rightBtn.addEventListener('click', () => move(1));
+  downBtn.addEventListener('click', softDrop);
+
+  /* ========= 遊戲結束/勝利 ========= */
+  function gameOver() {
+    stop();
+    msgEl.innerHTML = 'Game Over!<br/>得分：' + score;
+    overlayEl.classList.remove('hidden');
+  }
+  function win() {
+    stop();
+    msgEl.innerHTML = '🏆<br/>恭喜你取得滿分！';
+    overlayEl.classList.remove('hidden');
+  }
+  function stop() {
+    clearInterval(timer);
+    timer = null;
+  }
+
+  restartBtn.addEventListener('click', start);
+  endBtn.addEventListener('click', () => {
+    overlayEl.innerHTML = '<div style="font-size:2rem">謝謝遊玩！</div>';
+  });
+
+  /* ========= 開始遊戲 ========= */
+  function resetBoard() {
+    boardEl.innerHTML = '';
+    completed.clear();
+    charQueue = [];
+  }
+  function start() {
+    overlayEl.classList.add('hidden');
+    resetBoard();
+    initMatrix();
+    score = 0;
     updateScore();
-    spawnNext();
-  </script></body>
+    falling = null;
+    spawnPiece();
+    if (!timer) timer = setInterval(tick, TICK_MS);
+  }
+  start();
+})();
+</script></body>
 </html>
