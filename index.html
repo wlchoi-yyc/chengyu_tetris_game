@@ -126,7 +126,15 @@ interact('.slot').dropzone({accept:'.block',overlap:0.4,
 function checkSlots(){const str=slots.map(s=>s.dataset.char||'').join('');if(str.length!==4)return;if(idioms.includes(str)){slots.forEach(s=>s.classList.add('correct'));setTimeout(()=>{slots.forEach(s=>{if(s.firstElementChild)s.firstElementChild.remove();s.dataset.char='';s.classList.remove('correct');});score++;updateScore();if(score>=20)endGame('🏆 恭喜你取得滿分！');},600);}else{slots.forEach(s=>s.classList.add('incorrect'));}}
 
 // -------------------- Game Over --------------------
-function checkGameOver(){if([...board.querySelectorAll('.block.stacked')].some(b=>b.offsetTop<=0))endGame('game over😭');}
+function checkGameOver(){
+  const boardTop=board.getBoundingClientRect().top;
+  if([...board.querySelectorAll('.block.stacked')].some(b=>{
+      const top=b.getBoundingClientRect().top;
+      return top<=boardTop+10; // 10px 緩衝，確保真正頂滿才判定
+    })){
+    endGame('game over😭');
+  }
+}
 function clearAll(){fallIntervals.forEach(id=>clearInterval(id));fallIntervals=[];clearInterval(spawnInterval);} 
 function endGame(msg){clearAll();overlay.innerHTML=`${msg}<br/>`;const r=document.createElement('button');r.textContent='重新開始';r.onclick=()=>location.reload();const e=document.createElement('button');e.textContent='結束遊戲';e.onclick=()=>window.close();overlay.appendChild(r);overlay.appendChild(e);overlay.style.visibility='visible';}
 
