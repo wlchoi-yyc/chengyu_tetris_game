@@ -5,9 +5,7 @@
   <title>成語俄羅斯方塊遊戲</title>
   <script src="https://cdn.jsdelivr.net/npm/interactjs/dist/interact.min.js"></script>
   <style>
-    * {
-      box-sizing: border-box;
-    }
+    * { box-sizing: border-box; }
     body {
       margin: 0;
       font-family: "Noto Sans TC", sans-serif;
@@ -21,20 +19,16 @@
       user-select: none;
       -webkit-user-select: none;
     }
-    #scoreBoard {
-      margin-top: 0.5rem;
-      font-size: 1.2rem;
-      font-weight: 700;
-    }
+    #scoreBoard { margin-top: .5rem; font-size: 1.2rem; font-weight: 700; }
     #gameBoard {
       position: relative;
       width: 100%;
       max-width: 480px;
       height: 70vh;
-      background: #ffffff;
+      background: #fff;
       border: 3px solid #444;
-      overflow: hidden;
       border-radius: 8px;
+      overflow: hidden;
     }
     .block {
       position: absolute;
@@ -43,17 +37,15 @@
       background: #8bc34a;
       color: #fff;
       border: 2px solid #558b2f;
+      border-radius: 4px;
       display: flex;
       align-items: center;
       justify-content: center;
       font-size: 1.5rem;
       font-weight: 700;
-      border-radius: 4px;
       touch-action: none;
     }
-    .stacked {
-      background: #4caf50;
-    }
+    .stacked { background: #4caf50; }
     #slotContainer {
       position: absolute;
       bottom: 8px;
@@ -71,22 +63,13 @@
       display: flex;
       align-items: center;
       justify-content: center;
-      font-size: 1.5rem;
-      font-weight: 700;
     }
-    .slot.correct {
-      border-color: #4caf50;
-    }
-    .slot.incorrect {
-      border-color: #f44336;
-    }
+    .slot.correct { border-color: #4caf50; }
+    .slot.incorrect { border-color: #f44336; }
     #messageOverlay {
       position: absolute;
-      top: 0;
-      left: 0;
-      width: 100%;
-      height: 100%;
-      background: rgba(0, 0, 0, 0.75);
+      inset: 0;
+      background: rgba(0,0,0,.75);
       color: #fff;
       display: flex;
       flex-direction: column;
@@ -96,16 +79,16 @@
       font-weight: 700;
       padding: 1rem;
       text-align: center;
-      z-index: 5;
       visibility: hidden;
+      z-index: 10;
     }
     #messageOverlay button {
-      margin-top: 1rem;
-      padding: 0.6rem 1.2rem;
-      font-size: 1rem;
+      margin: .8rem .4rem 0;
+      padding: .6rem 1.4rem;
       border: none;
       border-radius: 4px;
       background: #ffeb3b;
+      font-size: 1rem;
       font-weight: 700;
       cursor: pointer;
     }
@@ -121,212 +104,211 @@
       <div class="slot" data-index="3"></div>
     </div>
     <div id="messageOverlay"></div>
-  </div>  <script>
-    // Idioms and distractor chars
-    const idioms = [
-      "一竅不通", "不恥下問", "茅塞頓開", "發人深省", "今非昔比", "老生常談", "拋磚引玉", "拾人牙慧",
-      "語無倫次", "強詞奪理", "一片冰心", "大義凜然", "出爾反爾", "守正不阿", "古道熱腸", "坐懷不亂",
-      "道不拾遺", "見義勇為", "涓滴歸公", "飲水思源"
-    ];
+  </div><script>
+// ---------------------- 遊戲資料 ----------------------
+const idioms = [
+  "一竅不通","不恥下問","茅塞頓開","發人深省","今非昔比","老生常談","拋磚引玉","拾人牙慧",
+  "語無倫次","強詞奪理","一片冰心","大義凜然","出爾反爾","守正不阿","古道熱腸","坐懷不亂",
+  "道不拾遺","見義勇為","涓滴歸公","飲水思源"
+];
 
-    const distractorPool = "天地玄黃宇宙洪荒日月盈昃辰宿列張寒來暑往秋收冬藏閏餘成歲律呂調陽雲騰致雨露結為霜".split("");
+// 可自行增減干擾字
+const distractorPool = "天地玄黃宇宙洪荒日月盈昃辰宿列張寒來暑往秋收冬藏閏餘成歲律呂調陽雲騰致雨露結為霜風雨雷電山川草木鳥獸蟲魚".split("");
 
-    const board = document.getElementById("gameBoard");
-    const scoreBoard = document.getElementById("scoreBoard");
-    const overlay = document.getElementById("messageOverlay");
-    const slotContainer = document.getElementById("slotContainer");
-    const slots = [...document.querySelectorAll(".slot")];
+// ---------------------- 基本參考 ----------------------
+const board = document.getElementById('gameBoard');
+const slots = Array.from(document.querySelectorAll('.slot'));
+const overlay = document.getElementById('messageOverlay');
+const scoreBoard = document.getElementById('scoreBoard');
 
-    let score = 0;
-    let usedIdioms = new Set();
-    let activeBlocks = [];
-    let gameIntervals = [];
+let score = 0;
+let usedIdioms = new Set();
+let fallIntervals = [];
+let spawnInterval;
 
-    // Helpers
-    function rand(min, max) {
-      return Math.floor(Math.random() * (max - min + 1)) + min;
+// ---------------------- 工具函式 ----------------------
+const rand = (min,max)=>Math.floor(Math.random()*(max-min+1))+min;
+const shuffle = arr => {
+  for(let i=arr.length-1;i>0;i--){const j=rand(0,i);[arr[i],arr[j]]=[arr[j],arr[i]];}return arr;
+};
+const updateScore = ()=>scoreBoard.textContent=`分數：${score} / 20`;
+
+// ---------------------- 遊戲流程 ----------------------
+function startGame(){
+  spawnBlocks();                      // 先來一組
+  spawnInterval = setInterval(spawnBlocks,2000); // 每 2 秒再來一組
+}
+
+function spawnBlocks(){
+  if(overlay.style.visibility==='visible')return; // 遊戲結束後不再生成
+
+  if(usedIdioms.size===idioms.length) usedIdioms.clear();
+  let idiom;
+  do{ idiom = idioms[rand(0,idioms.length-1)]; }while(usedIdioms.has(idiom));
+  usedIdioms.add(idiom);
+
+  const chars = idiom.split("");
+  const distractors=[];
+  while(distractors.length<2){
+    const c=distractorPool[rand(0,distractorPool.length-1)];
+    if(!chars.includes(c)&&!distractors.includes(c)) distractors.push(c);
+  }
+  const all = shuffle([...chars,...distractors]);
+
+  // 逐字延時掉落，避免同時重疊
+  all.forEach((char,idx)=>setTimeout(()=>createFallingBlock(char),idx*300));
+}
+
+function createFallingBlock(char){
+  const block=document.createElement('div');
+  block.className='block';
+  block.textContent=char;
+  block.dataset.char=char;
+  block.style.left=`${rand(0,board.clientWidth-56)}px`;
+  block.style.top='-60px';
+  board.appendChild(block);
+  makeDraggable(block);
+  fall(block);
+}
+
+function fall(block){
+  const id=setInterval(()=>{
+    if(block.isDragging){return;}
+    const nextTop=block.offsetTop+2;
+    // 與底部或其它 stack 碰撞即停止
+    if(nextTop+block.offsetHeight >= board.clientHeight - 70){ // 70 ≈ 底部 slotContainer 高度
+      settleBlock(block,id);
+    }else if([...board.querySelectorAll('.block.stacked')].some(b=>isCollide(block,b,2))){
+      settleBlock(block,id);
+    }else{
+      block.style.top=`${nextTop}px`;
     }
+  },16);
+  fallIntervals.push(id);
+}
 
-    function shuffle(arr) {
-      for (let i = arr.length - 1; i > 0; i--) {
-        const j = Math.floor(Math.random() * (i + 1));
-        [arr[i], arr[j]] = [arr[j], arr[i]];
-      }
-      return arr;
-    }
+function settleBlock(block,id){
+  clearInterval(id);
+  fallIntervals=fallIntervals.filter(x=>x!==id);
+  block.classList.add('stacked');
+  checkGameOver();
+}
 
-    function resetSlots() {
-      slots.forEach((slot) => {
-        slot.textContent = "";
-        slot.dataset.char = "";
-        slot.classList.remove("correct", "incorrect");
-      });
-    }
+function isCollide(a,b,offset=0){
+  if(a===b) return false;
+  const r1=a.getBoundingClientRect();
+  const r2=b.getBoundingClientRect();
+  return r1.left<r2.right && r1.right>r2.left && r1.bottom+offset>r2.top && r1.top<r2.bottom;
+}
 
-    function updateScore() {
-      scoreBoard.textContent = `分數：${score} / 20`;
-    }
-
-    function endGame(message) {
-      clearAllIntervals();
-      overlay.innerHTML = `${message}<br />`;
-      const btnGroup = document.createElement("div");
-      const restartBtn = document.createElement("button");
-      restartBtn.textContent = "重新開始";
-      restartBtn.onclick = () => location.reload();
-      const exitBtn = document.createElement("button");
-      exitBtn.textContent = "結束遊戲";
-      exitBtn.onclick = () => window.close();
-      btnGroup.appendChild(restartBtn);
-      btnGroup.appendChild(exitBtn);
-      overlay.appendChild(btnGroup);
-      overlay.style.visibility = "visible";
-    }
-
-    function clearAllIntervals() {
-      gameIntervals.forEach((id) => clearInterval(id));
-      gameIntervals = [];
-    }
-
-    // Collision detection for stacking
-    function willCollide(block) {
-      const nextY = block.offsetTop + 2; // fall speed
-      if (nextY + block.offsetHeight >= board.offsetHeight - slotContainer.offsetHeight) return true;
-      return Array.from(board.children).some((el) => {
-        if (!el.classList.contains("block") || el === block || !el.classList.contains("stacked")) return false;
-        const rect1 = block.getBoundingClientRect();
-        const rect2 = el.getBoundingClientRect();
-        return (
-          rect1.left < rect2.right &&
-          rect1.right > rect2.left &&
-          rect1.bottom + 2 >= rect2.top &&
-          rect1.bottom <= rect2.top + 6
-        );
-      });
-    }
-
-    function spawnBlocks() {
-      if (usedIdioms.size === idioms.length) usedIdioms.clear();
-      let idiom;
-      do {
-        idiom = idioms[rand(0, idioms.length - 1)];
-      } while (usedIdioms.has(idiom));
-      usedIdioms.add(idiom);
-
-      const chars = idiom.split("");
-      const distractors = [];
-      while (distractors.length < 2) {
-        const c = distractorPool[rand(0, distractorPool.length - 1)];
-        if (!chars.includes(c) && distractors.indexOf(c) === -1) distractors.push(c);
-      }
-
-      const allChars = shuffle([...chars, ...distractors]);
-
-      allChars.forEach((char) => {
-        const block = document.createElement("div");
-        block.className = "block";
-        block.textContent = char;
-        block.dataset.char = char;
-        block.style.left = `${rand(0, board.offsetWidth - 56)}px`;
-        block.style.top = "-60px";
-        board.appendChild(block);
-        activeBlocks.push(block);
-        fall(block);
-        makeDraggable(block);
-      });
-    }
-
-    function fall(block) {
-      const intervalId = setInterval(() => {
-        if (!block.isDragging) {
-          if (!willCollide(block)) {
-            block.style.top = `${block.offsetTop + 2}px`;
-          } else {
-            block.classList.add("stacked");
-            clearInterval(intervalId);
-            gameIntervals = gameIntervals.filter((id) => id !== intervalId);
-            checkGameOver();
-            // Remove reference from activeBlocks
-            activeBlocks = activeBlocks.filter((b) => b !== block);
-          }
+// ---------------------- 拖放處理 ----------------------
+function makeDraggable(el){
+  interact(el).draggable({
+    listeners:{
+      start(event){
+        el.isDragging=true;
+        // 若方塊起始在 slot 內 => 清空該 slot
+        if(el.parentElement.classList.contains('slot')){
+          const slot=el.parentElement;
+          slot.dataset.char='';
+          slot.classList.remove('correct','incorrect');
+          board.appendChild(el);
+          // 將方塊定位到與 slot 相同位置
+          const boardRect=board.getBoundingClientRect();
+          const slotRect=slot.getBoundingClientRect();
+          el.style.left=`${slotRect.left-boardRect.left}px`;
+          el.style.top=`${slotRect.top-boardRect.top}px`;
+          el.style.transform='none';
+          el.setAttribute('data-x',0);
+          el.setAttribute('data-y',0);
         }
-      }, 16);
-      gameIntervals.push(intervalId);
-    }
-
-    function checkGameOver() {
-      const stacked = [...board.querySelectorAll(".block.stacked")];
-      if (stacked.some((b) => b.offsetTop < 0)) {
-        endGame("Game Over! 字塊堆疊到頂\uD83D\uDE1E");
-      } else if (stacked.length > 200) {
-        // Fallback safety limit
-        endGame("Game Over! 字塊過多\uD83D\uDE1E");
-      }
-    }
-
-    function makeDraggable(element) {
-      interact(element)
-        .draggable({
-          listeners: {
-            start() {
-              element.isDragging = true;
-            },
-            move(event) {
-              const x = (parseFloat(element.getAttribute("data-x")) || 0) + event.dx;
-              const y = (parseFloat(element.getAttribute("data-y")) || 0) + event.dy;
-              element.style.transform = `translate(${x}px, ${y}px)`;
-              element.setAttribute("data-x", x);
-              element.setAttribute("data-y", y);
-            },
-            end() {
-              element.isDragging = false;
-            },
-          },
-          inertia: true,
-        });
-    }
-
-    // Dropzones for slots
-    interact(".slot").dropzone({
-      accept: ".block",
-      overlap: 0.55,
-      ondropactivate(event) {
-        event.target.classList.remove("correct", "incorrect");
       },
-      ondrop(event) {
-        const slot = event.target;
-        if (slot.dataset.char) return; // already filled
-        const block = event.relatedTarget;
-        slot.textContent = block.dataset.char;
-        slot.dataset.char = block.dataset.char;
-        block.remove();
-        checkSlots();
+      move(event){
+        const x=(parseFloat(el.getAttribute('data-x'))||0)+event.dx;
+        const y=(parseFloat(el.getAttribute('data-y'))||0)+event.dy;
+        el.style.transform=`translate(${x}px,${y}px)`;
+        el.setAttribute('data-x',x);
+        el.setAttribute('data-y',y);
       },
-    });
+      end(){ el.isDragging=false; }
+    },
+    inertia:true
+  });
+}
 
-    function checkSlots() {
-      const chars = slots.map((s) => s.dataset.char || "").join("");
-      if (chars.length === 4) {
-        if (idioms.includes(chars)) {
-          slots.forEach((s) => s.classList.add("correct"));
-          setTimeout(() => {
-            resetSlots();
-            score += 1;
-            updateScore();
-            if (score >= 20) {
-              endGame("\uD83C\uDFC6 恭喜你取得滿分！\uD83C\uDFC6");
-            } else {
-              spawnBlocks();
-            }
-          }, 600);
-        } else {
-          slots.forEach((s) => s.classList.add("incorrect"));
-        }
+// Slot dropzone
+interact('.slot').dropzone({
+  accept: '.block',
+  overlap: 0.55,
+  ondropactivate(event){event.target.classList.remove('correct','incorrect');},
+  ondrop(event){
+    const slot=event.target;
+    const block=event.relatedTarget;
+    if(slot.firstElementChild){return;} // 已有方塊
+
+    // 清除 block 位移並放入 slot 內
+    block.style.transform='none';
+    block.setAttribute('data-x',0);
+    block.setAttribute('data-y',0);
+    block.style.position='relative';
+    block.style.left='0';
+    block.style.top='0';
+    slot.appendChild(block);
+    slot.dataset.char=block.dataset.char;
+    checkSlots();
+  }
+});
+
+function checkSlots(){
+  const chars = slots.map(s=>s.dataset.char||'').join('');
+  if(chars.length!==4) return;
+  if(idioms.includes(chars)){
+    slots.forEach(s=>s.classList.add('correct'));
+    setTimeout(()=>{
+      // 清除 slot 與其中的方塊
+      slots.forEach(s=>{
+        if(s.firstElementChild) s.firstElementChild.remove();
+        s.dataset.char='';
+        s.classList.remove('correct');
+      });
+      score++;
+      updateScore();
+      if(score>=20){
+        endGame('🏆 恭喜你取得滿分！');
       }
-    }
+    },600);
+  }else{
+    slots.forEach(s=>s.classList.add('incorrect'));
+  }
+}
 
-    // Start game
-    updateScore();
-    spawnBlocks();
-  </script></body>
+function checkGameOver(){
+  if([...board.querySelectorAll('.block.stacked')].some(b=>b.offsetTop<0)){
+    endGame('Game Over! 字塊堆疊到頂 😢');
+  }
+}
+
+function clearAllTimers(){
+  fallIntervals.forEach(id=>clearInterval(id));
+  fallIntervals=[];
+  clearInterval(spawnInterval);
+}
+
+function endGame(msg){
+  clearAllTimers();
+  overlay.innerHTML=`${msg}<br/>`;
+  const restart=document.createElement('button');
+  restart.textContent='重新開始';
+  restart.onclick=()=>location.reload();
+  const exit=document.createElement('button');
+  exit.textContent='結束遊戲';
+  exit.onclick=()=>window.close();
+  overlay.appendChild(restart);
+  overlay.appendChild(exit);
+  overlay.style.visibility='visible';
+}
+
+updateScore();
+startGame();
+</script></body>
 </html>
