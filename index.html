@@ -6,28 +6,31 @@
 <style>
  :root{
   --board-bg:#111;
-  --cell-size:40px;/* 動態覆寫 */
+  --cell-size:40px;/* 由 JS 動態覆寫 */
   --block-bg:#f0c040;
   --block-color:#000;
+  --slot-bg:#444;
  }
  *{box-sizing:border-box;margin:0;padding:0;font-family:"Noto Sans TC",sans-serif;-webkit-user-select:none;user-select:none}
  body{display:flex;justify-content:center;align-items:center;height:100vh;background:#222;color:#fff;overflow:hidden}
- #game{display:flex;flex-direction:column;align-items:center;position:relative}
+ #game{position:relative;display:flex;flex-direction:column;align-items:center}
  #board{background:var(--board-bg);position:relative;touch-action:none}
- .block{position:absolute;width:var(--cell-size);height:var(--cell-size);background:var(--block-bg);border-radius:4px;display:flex;justify-content:center;align-items:center;font-weight:700;font-size:calc(var(--cell-size)*0.6);color:var(--block-color);box-shadow:0 0 4px rgba(0,0,0,.4);transition:box-shadow .15s}
+ .block{position:absolute;width:var(--cell-size);height:var(--cell-size);background:var(--block-bg);border-radius:4px;display:flex;justify-content:center;align-items:center;font-weight:700;font-size:calc(var(--cell-size)*0.6);color:var(--block-color);box-shadow:0 0 4px rgba(0,0,0,.4);transition:box-shadow .12s}
  .block.selected{box-shadow:0 0 0 3px #00eaff inset,0 0 6px #00eaff}
+ #slots{display:flex;gap:4px;margin-top:4px}
+ .slot{width:var(--cell-size);height:var(--cell-size);background:var(--slot-bg);border:2px dashed #888;border-radius:4px;display:flex;justify-content:center;align-items:center;position:relative}
  #score{margin-top:8px;font-size:1.2rem}
- .ctrls{position:fixed;bottom:calc(env(safe-area-inset-bottom,0px)+10px);left:0;width:100%;display:flex;justify-content:center;gap:14px;z-index:20}
- .ctrls button{padding:12px 20px;font-size:1.3rem;border:none;border-radius:50%;background:#f0c040;color:#000;width:56px;height:56px;display:flex;justify-content:center;align-items:center;box-shadow:0 2px 4px rgba(0,0,0,.4);cursor:pointer}
- #overlay{position:absolute;inset:0;background:rgba(0,0,0,.8);display:flex;flex-direction:column;justify-content:center;align-items:center;gap:20px;z-index:30;backdrop-filter:blur(4px)}
+ .ctrls{position:fixed;bottom:calc(env(safe-area-inset-bottom,0px)+10px);left:0;width:100%;display:flex;justify-content:center;gap:16px;z-index:30}
+ .ctrls button{padding:12px;font-size:1.3rem;border:none;border-radius:50%;background:#f0c040;color:#000;width:60px;height:60px;display:flex;justify-content:center;align-items:center;box-shadow:0 2px 4px rgba(0,0,0,.4);cursor:pointer}
+ #overlay{position:absolute;inset:0;background:rgba(0,0,0,.8);display:flex;flex-direction:column;justify-content:center;align-items:center;gap:20px;z-index:40;backdrop-filter:blur(4px)}
  #overlay.hidden{display:none}
- #message{font-size:1.6rem;line-height:1.4;text-align:center}
  #overlay button{padding:10px 24px;font-size:1.1rem;border:none;border-radius:6px;background:#f0c040;color:#000;cursor:pointer}
 </style>
 </head>
 <body>
  <div id="game">
   <div id="board"></div>
+  <div id="slots"></div>
   <div id="score">得分：0 / 20</div>
   <div class="ctrls">
    <button id="leftBtn">◀︎</button>
@@ -42,11 +45,12 @@
  </div>
 <script>
 (()=>{
- /* ======== 常數設定 ======== */
- const COLS=10,ROWS=20,TICK_MS=500,MAX_SCORE=20;
+ /* ======== 常量 ======== */
+ const COLS=10,ROWS=18,TICK=500,MAX_SCORE=20; // 行數調為 18，底下額外顯示四槽
  const idioms=["畫蛇添足","亡羊補牢","對牛彈琴","守株待兔","掩耳盜鈴","指鹿為馬","刻舟求劍","盲人摸象","井底之蛙","草木皆兵","紙上談兵","負荊請罪","自相矛盾","畫龍點睛","杯弓蛇影","四海為家","百發百中","一帆風順","順手牽羊","臥薪嘗膽"];
  /* ======== DOM ======== */
  const boardEl=document.getElementById('board');
+ const slotsEl=document.getElementById('slots');
  const scoreEl=document.getElementById('score');
  const overlayEl=document.getElementById('overlay');
  const msgEl=document.getElementById('message');
@@ -57,68 +61,98 @@
  const endBtn=document.getElementById('endBtn');
  /* ======== 狀態 ======== */
  let cellSize,matrix,timer=null,score=0,completed=new Set();
- let falling=[]; // 當前批次下落字塊陣列
- let currentBatchId=0;
- let active=null; // 使用者正在操控的單一字塊
- /* ======== 工具 ======== */
+ let falling=[]; // 當前批次下落字塊
+ let currentBatch=0;
+ let active=null;
+ const slots=[null,null,null,null]; // 儲存四個槽對應的 block or null
+ /* ======== 工具函式 ======== */
  const rand=a=>a[Math.floor(Math.random()*a.length)];
  const shuffle=a=>{const arr=[...a];for(let i=arr.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[arr[i],arr[j]]=[arr[j],arr[i]];}return arr};
- function resize(){cellSize=Math.floor(Math.min(window.innerWidth/(COLS+2),window.innerHeight/(ROWS+4)));document.documentElement.style.setProperty('--cell-size',cellSize+'px');boardEl.style.width=COLS*cellSize+'px';boardEl.style.height=ROWS*cellSize+'px';}
+ function resize(){cellSize=Math.floor(Math.min(window.innerWidth/(COLS+2),window.innerHeight/(ROWS+6)));document.documentElement.style.setProperty('--cell-size',cellSize+'px');boardEl.style.width=COLS*cellSize+'px';boardEl.style.height=ROWS*cellSize+'px';slotsEl.style.width=COLS*cellSize+'px';}
  window.addEventListener('resize',resize);resize();
+ /* ======== 初始化插槽 DOM ======== */
+ function buildSlots(){slotsEl.innerHTML='';for(let i=0;i<4;i++){const d=document.createElement('div');d.className='slot';slotsEl.appendChild(d);} }
+ buildSlots();
+ const slotElems=[...slotsEl.children];
  /* ======== 棋盤 ======== */
  function initMatrix(){matrix=Array.from({length:ROWS},()=>Array(COLS).fill(null));}
- function createBlock(ch,batchId){const el=document.createElement('div');el.className='block';el.textContent=ch;boardEl.appendChild(el);return {ch,row:-1,col:0,el,batchId};}
- function setPos(b){b.el.style.left=b.col*cellSize+'px';b.el.style.top=b.row*cellSize+'px';}
+ function createBlock(ch,batchId){const el=document.createElement('div');el.className='block';el.textContent=ch;boardEl.parentElement.appendChild(el);return {ch,row:-1,col:0,el,batchId,slotIndex:null};}
+ function setPos(b){if(b.slotIndex!==null){const rect=slotElems[b.slotIndex].getBoundingClientRect();const parentRect=boardEl.parentElement.getBoundingClientRect();b.el.style.left=rect.left-parentRect.left+'px';b.el.style.top=rect.top-parentRect.top+'px';}else{b.el.style.left=b.col*cellSize+'px';b.el.style.top=b.row*cellSize+'px';}}
  function collision(r,c){return r>=ROWS||(r>=0&&matrix[r][c]);}
- /* ======== 選取塊 ======== */
- function setActive(b){if(active)active.el.classList.remove('selected');active=b;active.el.classList.add('selected');}
- /* ======== 拖曳 ======== */
- function makeDraggable(block){let dragging=false,startX=0,startCol=0;const el=block.el;
- el.addEventListener('pointerdown',e=>{e.preventDefault();dragging=true;startX=e.clientX;startCol=block.col;setActive(block);el.setPointerCapture(e.pointerId);});
- el.addEventListener('pointermove',e=>{if(!dragging)return;const dx=e.clientX-startX;const offset=Math.round(dx/cellSize);let target=Math.min(Math.max(startCol+offset,0),COLS-1);if(!collision(block.row,target)){block.col=target;setPos(block);}});
- const endDrag=()=>dragging=false;
- el.addEventListener('pointerup',endDrag);el.addEventListener('pointercancel',endDrag);
- el.addEventListener('click',()=>setActive(block)); // 輕觸選取
- }
- /* ======== 給按鈕用的移動 ======== */
- function moveActive(delta){if(!active)return;const target=Math.min(Math.max(active.col+delta,0),COLS-1);if(!collision(active.row,target)){active.col=target;setPos(active);}}
- function softDropActive(){if(!active)return;while(!collision(active.row+1,active.col))active.row++;setPos(active);lock(active);falling=falling.filter(b=>b!==active);active=null;}
- /* ======== 生成 6 字批次 ======== */
- function spawnBatch(){if(completed.size>=idioms.length)return;currentBatchId++;
- const remaining=idioms.filter(i=>!completed.has(i));const word=rand(remaining);
+ /* ======== 生成批次 ======== */
+ function spawnBatch(){if(completed.size>=idioms.length)return;currentBatch++;
+ const remain=idioms.filter(i=>!completed.has(i));const word=rand(remain);
  const extras=shuffle(idioms.join('').split('').filter(c=>!word.includes(c))).slice(0,2);
  const chars=shuffle([...word.split(''),...extras]);
- const colPool=shuffle([...Array(COLS).keys()]);
- chars.forEach((ch,i)=>{const b=createBlock(ch,currentBatchId);b.col=colPool[i%COLS];setPos(b);makeDraggable(b);falling.push(b);});
+ const colsPool=shuffle([...Array(COLS).keys()]);
+ chars.forEach((ch,i)=>{const b=createBlock(ch,currentBatch);b.col=colsPool[i%COLS];setPos(b);makeDraggable(b);falling.push(b);} );
  }
- /* ======== 鎖定 & 清除 ======== */
- function lock(b){if(b.row<0){gameOver();return;}matrix[b.row][b.col]=b;checkClear();}
- function applyGravity(){for(let c=0;c<COLS;c++){for(let r=ROWS-2;r>=0;r--){if(matrix[r][c]&&!matrix[r+1][c]){let nr=r;while(!collision(nr+1,c))nr++;const blk=matrix[r][c];matrix[r][c]=null;matrix[nr][c]=blk;blk.row=nr;setPos(blk);}}}}
- function checkClear(){let clearedBatch=null;
- for(let r=0;r<ROWS;r++){for(let c=0;c<=COLS-4;c++){const seq=[matrix[r][c],matrix[r][c+1],matrix[r][c+2],matrix[r][c+3]];if(seq.every(cell=>cell)){const word=seq.map(x=>x.ch).join('');if(idioms.includes(word)&&!completed.has(word)){clearedBatch=seq[0].batchId;break;}}}if(clearedBatch)break;}
- if(clearedBatch!==null){for(let r=0;r<ROWS;r++){for(let c=0;c<COLS;c++){const cell=matrix[r][c];if(cell&&cell.batchId===clearedBatch){boardEl.removeChild(cell.el);matrix[r][c]=null;}}}
- completed.add(idioms.find(w=>w.split('').every(ch=>true))); // 標記完成
- score++;updateScore();applyGravity();if(score>=MAX_SCORE)win();}
+ /* ======== 拖曳 ======== */
+ function makeDraggable(block){let dragging=false,startX=0,startY=0,offsetX=0,offsetY=0;const el=block.el;
+ function setActive(b){if(active)active.el.classList.remove('selected');active=b;b.el.classList.add('selected');}
+ el.addEventListener('pointerdown',e=>{e.preventDefault();dragging=true;setActive(block);startX=e.clientX;startY=e.clientY;const rect=el.getBoundingClientRect();offsetX=startX-rect.left;offsetY=startY-rect.top;el.setPointerCapture(e.pointerId);
+ // 若原本在 slot，清空 slot
+ if(block.slotIndex!==null){slots[block.slotIndex]=null;block.slotIndex=null;}
+ });
+ el.addEventListener('pointermove',e=>{if(!dragging)return;const parentRect=boardEl.parentElement.getBoundingClientRect();el.style.left=e.clientX-offsetX-parentRect.left+'px';el.style.top=e.clientY-offsetY-parentRect.top+'px';});
+ const endDrag=e=>{if(!dragging)return;dragging=false;el.releasePointerCapture(e.pointerId);
+ // 判斷是否進入插槽
+ let placed=false;
+ slotElems.forEach((slotEl,idx)=>{const sr=slotEl.getBoundingClientRect();if(e.clientX>sr.left && e.clientX<sr.right && e.clientY>sr.top && e.clientY<sr.bottom && !slots[idx]){
+   slots[idx]=block;block.slotIndex=idx;placed=true;setPos(block);
+   // 若之前在矩陣，移除
+   if(block.row>=0)matrix[block.row][block.col]=null;
+ }});
+ if(!placed){ // 若放回棋盤內，嘗試對應列/欄
+   const parentRect=boardEl.getBoundingClientRect();const relX=e.clientX-parentRect.left;const relY=e.clientY-parentRect.top;
+   const c=Math.floor(relX/cellSize);const r=Math.floor(relY/cellSize);
+   if(c>=0&&c<COLS&&r>=0&&r<ROWS&&!collision(r,c)){
+     block.col=c;block.row=r;setPos(block);matrix[r][c]=block; // 鎖定
+   }else{ // 否則掉到原本位置或頂端
+     if(block.row<0){block.col=Math.min(Math.max(block.col,0),COLS-1);setPos(block);}else{setPos(block);} }
  }
+ checkSlots();
+ };
+ el.addEventListener('pointerup',endDrag);
+ el.addEventListener('pointercancel',endDrag);
+ }
+ /* ======== 填滿四槽檢查 ======== */
+ function checkSlots(){if(slots.every(s=>s)){const word=slots.map(b=>b.ch).join('');const slotBatchId=slots[0].batchId;
+ if(idioms.includes(word)){// 成功
+   slots.forEach(b=>boardEl.parentElement.removeChild(b.el));
+   // 移除同批次其他字
+   [...boardEl.parentElement.querySelectorAll('.block')].forEach(el=>{const b=findBlockByEl(el);if(b&&b.batchId===slotBatchId){if(matrix[b.row]&&matrix[b.row][b.col]===b)matrix[b.row][b.col]=null;boardEl.parentElement.removeChild(b.el);} });
+   score++;updateScore();completed.add(word);
+   clearSlots();applyGravity();if(score>=MAX_SCORE)win();else spawnBatch();
+ }else{
+   // 不是正確成語，閃紅提示並彈出
+   slotElems.forEach(el=>{el.style.borderColor='#f00';setTimeout(()=>el.style.borderColor='#888',400);} );
+ }
+ }
+ }
+ function clearSlots(){for(let i=0;i<4;i++){slots[i]=null;} }
+ /* ======== 查找 block by element ======== */
+ function findBlockByEl(el){return [...falling, ...matrix.flat().filter(Boolean), ...slots.filter(Boolean)].find(b=>b.el===el);} // 簡易搜尋
+ /* ======== falling 重力 ======== */
+ function tick(){for(let i=falling.length-1;i>=0;i--){const b=falling[i];if(b.slotIndex!==null)continue;const nr=b.row+1;if(!collision(nr,b.col)){b.row=nr;setPos(b);}else{if(b.row>=0){matrix[b.row][b.col]=b;}falling.splice(i,1);} }
+ if(falling.length===0)spawnBatch();}
+ function applyGravity(){for(let c=0;c<COLS;c++){for(let r=ROWS-2;r>=0;r--){if(matrix[r][c]&&!matrix[r+1][c]){let nr=r;while(!collision(nr+1,c))nr++;const blk=matrix[r][c];matrix[r][c]=null;matrix[nr][c]=blk;blk.row=nr;setPos(blk);} }} }
  /* ======== 分數 ======== */
  function updateScore(){scoreEl.textContent=`得分：${score} / ${MAX_SCORE}`;}
- /* ======== 遊戲循環 ======== */
- function tick(){// 先讓所有 falling 向下
- for(let i=falling.length-1;i>=0;i--){const b=falling[i];const nr=b.row+1;if(!collision(nr,b.col)){b.row=nr;setPos(b);}else{lock(b);falling.splice(i,1);if(b===active)active=null;}}
- if(falling.length===0)spawnBatch();}
- /* ======== 事件 ======== */
+ /* ======== 控制按鈕只針對選中塊 ======== */
+ function moveActive(dx){if(!active||active.slotIndex!==null)return;const target=Math.min(Math.max(active.col+dx,0),COLS-1);if(!collision(active.row,target)){active.col=target;setPos(active);} }
+ function softDropActive(){if(!active||active.slotIndex!==null)return;while(!collision(active.row+1,active.col))active.row++;setPos(active);matrix[active.row][active.col]=active;falling=falling.filter(b=>b!==active);active=null;}
  document.addEventListener('keydown',e=>{if(overlayEl.classList.contains('hidden')){if(e.key==='ArrowLeft')moveActive(-1);else if(e.key==='ArrowRight')moveActive(1);else if(e.key==='ArrowDown')softDropActive();}});
  leftBtn.onclick=()=>moveActive(-1);rightBtn.onclick=()=>moveActive(1);downBtn.onclick=softDropActive;
  /* ======== 結束/勝利 ======== */
  function stop(){clearInterval(timer);timer=null;}
  function gameOver(){stop();msgEl.innerHTML=`Game Over!<br/>得分：${score}`;overlayEl.classList.remove('hidden');}
  function win(){stop();msgEl.innerHTML='🏆<br/>恭喜你取得滿分！';overlayEl.classList.remove('hidden');}
- /* ======== 重置 / 開始 ======== */
- function reset(){boardEl.innerHTML='';falling=[];completed.clear();active=null;score=0;updateScore();initMatrix();}
- function start(){overlayEl.classList.add('hidden');reset();spawnBatch();if(!timer)timer=setInterval(tick,TICK_MS);} 
- restartBtn.onclick=start;
- endBtn.onclick=()=>overlayEl.innerHTML='<div style="font-size:2rem">謝謝遊玩！</div>';
- /* ======== 初始啟動 ======== */
+ /* ======== 重設 & 開始 ======== */
+ function reset(){boardEl.parentElement.querySelectorAll('.block').forEach(el=>el.remove());falling=[];active=null;completed.clear();score=0;updateScore();initMatrix();clearSlots();}
+ function start(){overlayEl.classList.add('hidden');reset();spawnBatch();if(!timer)timer=setInterval(tick,TICK);} 
+ restartBtn.onclick=start;endBtn.onclick=()=>overlayEl.innerHTML='<div style="font-size:2rem">謝謝遊玩！</div>';
+ /* ======== 啟動 ======== */
  start();
 })();
 </script>
