@@ -48,10 +48,10 @@ let score=0,usedIdioms=new Set(),fallIntervals=[],spawnInterval;
 const rand=(min,max)=>Math.floor(Math.random()*(max-min+1))+min;
 const shuffle=a=>{for(let i=a.length-1;i>0;i--){const j=rand(0,i);[a[i],a[j]]=[a[j],a[i]];}return a;};
 const updateScore=()=>scoreBoard.textContent=`分數：${score} / 20`;
-const bottomLimit=()=>board.clientHeight-slotContainer.offsetHeight-8; // 方塊不可超過此高度
+const bottomLimit=()=>board.clientHeight-slotContainer.offsetHeight-8; // 下落停止線
 
 // -------------------- 遊戲入口 --------------------
-function startGame(){spawnBlocks();spawnInterval=setInterval(spawnBlocks,10000);} // 10 秒
+function startGame(){spawnBlocks();spawnInterval=setInterval(spawnBlocks,10000);} // 每 10 秒
 
 // -------------------- 生成字塊 --------------------
 function spawnBlocks(){
@@ -60,7 +60,8 @@ function spawnBlocks(){
   let idiom;do{idiom=idioms[rand(0,idioms.length-1)];}while(usedIdioms.has(idiom));
   usedIdioms.add(idiom);
   const chars=idiom.split("");
-  const distractors=[];while(distractors.length<2){const c=distractorPool[rand(0,distractorPool.length-1)];if(!chars.includes(c)&&!distractors.includes(c))distractors.push(c);}  
+  const distractors=[];
+  while(distractors.length<2){const c=distractorPool[rand(0,distractorPool.length-1)];if(!chars.includes(c)&&!distractors.includes(c))distractors.push(c);}  
   const all=shuffle([...chars,...distractors]);
   all.forEach((c,i)=>setTimeout(()=>createBlock(c),i*300));
 }
@@ -88,24 +89,28 @@ function makeDraggable(el){
     listeners:{
       start(){
         el.isDragging=true;
+        // 若原本在 slot，移回 board
         if(el.parentElement.classList.contains('slot')){
           const slot=el.parentElement;slot.dataset.char='';slot.classList.remove('correct','incorrect');board.appendChild(el);
-          const br=board.getBoundingClientRect(),sr=slot.getBoundingClientRect();el.style.left=`${sr.left-br.left}px`;el.style.top=`${sr.top-br.top}px`;el.style.position='absolute';el.setAttribute('data-x',0);el.setAttribute('data-y',0);
+          const br=board.getBoundingClientRect(),sr=slot.getBoundingClientRect();
+          el.style.left=`${sr.left-br.left}px`;el.style.top=`${sr.top-br.top}px`;
+          el.style.position='absolute';el.setAttribute('data-x',0);el.setAttribute('data-y',0);
           if(el.fallID==null)startFalling(el);
         }
       },
       move(evt){
         let x=(+el.getAttribute('data-x')||0)+evt.dx;
         let y=(+el.getAttribute('data-y')||0)+evt.dy;
-        // 限制拖曳在 board 內
-        const maxX=board.clientWidth-el.offsetWidth, maxY=bottomLimit()-el.offsetHeight;
-        x=Math.min(Math.max(x+el.offsetLeft,0),maxX)-el.offsetLeft; // compensate absolute left
+        // 新邊界：允許進入 slot 區域
+        const maxX=board.clientWidth-el.offsetWidth;
+        const maxY=board.clientHeight-el.offsetHeight; // 可達最底
+        x=Math.min(Math.max(x+el.offsetLeft,0),maxX)-el.offsetLeft;
         y=Math.min(Math.max(y+el.offsetTop,0),maxY)-el.offsetTop;
         el.style.transform=`translate(${x}px,${y}px)`;
         el.setAttribute('data-x',x);el.setAttribute('data-y',y);
       },
       end(){el.isDragging=false;}
-    },inertia:true,modifiers:[interact.modifiers.restrictRect({restriction: board, endOnly:true})]
+    },inertia:true,modifiers:[interact.modifiers.restrictRect({restriction: board,endOnly:true})]
   });
 }
 
