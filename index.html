@@ -136,7 +136,7 @@ function checkGameOver(){
   }
 }
 function clearAll(){fallIntervals.forEach(id=>clearInterval(id));fallIntervals=[];clearInterval(spawnInterval);} 
-function endGame(msg){clearAll();overlay.innerHTML=`${msg}<br/>`;const r=document.createElement('button');r.textContent='重新開始';r.onclick=()=>location.reload();const e=document.createElement('button');e.textContent='結束遊戲';e.onclick=()=>window.close();overlay.appendChild(r);overlay.appendChild(e);overlay.style.visibility='visible';}
+function endGame(msg){clearAll();overlay.innerHTML=`${msg}<br/>`;const r=document.createElement('button');r.textContent='重新開始';r.onclick=()=>location.reload();const e=document.createElement('button');e.textContent='結束遊戲';e.onclick=()=>{overlay.innerHTML='謝謝參與😀';};overlay.appendChild(r);overlay.appendChild(e);overlay.style.visibility='visible';}
 
 updateScore();startGame();
 </script></body>
