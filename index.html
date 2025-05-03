@@ -10,11 +10,12 @@
     #scoreBoard{margin-top:.5rem;font-size:1.2rem;font-weight:700}
     
     /* 加了背景圖片的 gameBoard */
-    #gameBoard {
+  #gameBoard {
   position: relative;
   width: 100%;
   max-width: 480px;
-  aspect-ratio: 9/16; /* 這一句！新增！ */
+  height: calc(100vh - 100px); /* 100px 預留給上方分數、下方空白 */
+  max-height: 640px;
   background-image: url('village_background.png');
   background-size: cover;
   background-position: center;
@@ -24,7 +25,7 @@
   border: 3px solid #444;
   border-radius: 8px;
   overflow: hidden;
-  display: none; /* 初始隱藏 */
+  display: none;
 }
 
     .block{position:absolute;width:56px;height:56px;background:#8bc34a;border:2px solid #558b2f;border-radius:4px;color:#fff;font-size:1.5rem;font-weight:700;display:flex;align-items:center;justify-content:center;touch-action:none}
