@@ -84,7 +84,7 @@ interact('.slot').dropzone({accept:'.block',overlap:0.4,ondropactivate(e){e.targ
 function checkSlots(){const str=slots.map(s=>s.dataset.char||'').join('');if(str.length!==4)return;if(idioms.includes(str)){slots.forEach(s=>s.classList.add('correct'));setTimeout(()=>{slots.forEach(s=>{if(s.firstElementChild)s.firstElementChild.remove();s.dataset.char='';s.classList.remove('correct');});score++;updateScore();if(score>=20)endGame('🏆 恭喜你取得滿分！');},600);}else{slots.forEach(s=>s.classList.add('incorrect'));}}
 
 // -------------------- Game Over --------------------
-function checkGameOver(){const topY=board.getBoundingClientRect().top;if([...board.querySelectorAll('.block.stacked')].some(b=>b.getBoundingClientRect().top<=topY+10))endGame('game over😭');}
+function checkGameOver(){const topY=board.getBoundingClientRect().top;if([...board.querySelectorAll('.block.stacked')].some(b=>b.getBoundingClientRect().top<=topY+10))endGame('Game Over😭');}
 function clearAll(){fallIntervals.forEach(id=>clearInterval(id));fallIntervals=[];clearInterval(spawnInterval);} 
 function endGame(msg){clearAll();overlay.innerHTML=`${msg}<br/>`;const r=document.createElement('button');r.textContent='重新開始';r.onclick=()=>location.reload();const e=document.createElement('button');e.textContent='結束遊戲';e.onclick=()=>{overlay.innerHTML='謝謝參與😀';};overlay.appendChild(r);overlay.appendChild(e);overlay.style.visibility='visible';}
 </script></body>
