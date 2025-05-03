@@ -2,7 +2,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>成語俄羅斯方塊遊戲</title>
+  <title>成語方塊遊戲</title>
   <script src="https://cdn.jsdelivr.net/npm/interactjs/dist/interact.min.js"></script>
   <style>
     *{box-sizing:border-box}
@@ -23,8 +23,8 @@
 </head>
 <body>
   <div id="scoreBoard" style="display:none">分數：0 / 20</div>  <!-- 遊戲簡介頁 -->  <div id="introOverlay" class="overlay">
-    <h1>成語俄羅斯方塊</h1>
-    <p>遊戲規則：拖曳掉落的字塊，<br>放入底部 4 個方格，<br>拼出正確成語即可得分。<br>每 10 秒會掉落新一組字塊。<br>玩家必須避免字塊堆疊到頂，<br>否則遊戲會自動結束。</p>
+    <h1>成語方塊遊戲</h1>
+    <p>遊戲規則：拖曳掉落的字塊，<br>放入底部 4 個方格，<br>拼出正確成語即可得分。<br>每 10 秒會掉落新一組字塊。<br>玩家必須不定時調整字塊位置，<br>避免字塊堆疊到頂，<br>否則遊戲會自動結束。</p>
     <button id="startBtn">開始遊戲</button>
   </div>  <!-- 遊戲區域 -->  <div id="gameBoard">
     <div id="slotContainer">
