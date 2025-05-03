@@ -11,21 +11,21 @@
     
     /* 加了背景圖片的 gameBoard */
     #gameBoard {
-      position: relative;
-      width: 100%;
-      max-width: 480px;
-      height: 70vh;
-      background-image: url('village_background.png'); /* 這裡改成你的圖檔名，例如 village_background.png */
-      background-size: cover;
-      background-position: center;
-      background-repeat: no-repeat;
-      background-color: rgba(255,255,255,0.5); /* 淡白色遮罩，讓字塊更清晰 */
-      background-blend-mode: lighten;
-      border: 3px solid #444;
-      border-radius: 8px;
-      overflow: hidden;
-      display: none; /* 初始隱藏 */
-    }
+  position: relative;
+  width: 100%;
+  max-width: 480px;
+  aspect-ratio: 3/4; /* 這一句！新增！ */
+  background-image: url('village_background.png');
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+  background-color: rgba(255,255,255,0.5);
+  background-blend-mode: lighten;
+  border: 3px solid #444;
+  border-radius: 8px;
+  overflow: hidden;
+  display: none; /* 初始隱藏 */
+}
 
     .block{position:absolute;width:56px;height:56px;background:#8bc34a;border:2px solid #558b2f;border-radius:4px;color:#fff;font-size:1.5rem;font-weight:700;display:flex;align-items:center;justify-content:center;touch-action:none}
     .stacked{background:#4caf50}
@@ -73,7 +73,7 @@ let score=0,usedIdioms=new Set(),fallIntervals=[],spawnInterval;
 const rand=(min,max)=>Math.floor(Math.random()*(max-min+1))+min;
 const shuffle=a=>{for(let i=a.length-1;i>0;i--){const j=rand(0,i);[a[i],a[j]]=[a[j],a[i]];}return a;};
 const updateScore=()=>scoreBoard.textContent=`分數：${score} / 20`;
-const bottomLimit=()=>board.clientHeight-slotContainer.offsetHeight-8;
+const bottomLimit=()=>board.offsetHeight-slotContainer.offsetHeight-8;
 
 // -------------------- 遊戲控制 --------------------
 startBtn.onclick=()=>{
