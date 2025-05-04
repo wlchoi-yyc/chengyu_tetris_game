@@ -1,20 +1,19 @@
 <!DOCTYPE html><html lang="zh-Hant">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>成語方塊遊戲</title>
-  <script src="https://cdn.jsdelivr.net/npm/interactjs/dist/interact.min.js"></script>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>成語方塊遊戲</title>
+<script src="https://cdn.jsdelivr.net/npm/interactjs/dist/interact.min.js"></script>
 <style>
-    *{box-sizing:border-box}
-    body{margin:0;font-family:"Noto Sans TC",sans-serif;background:#f0f4f8;height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:flex-start;-webkit-user-select:none;user-select:none;overflow:hidden}
-    #scoreBoard{margin-top:.5rem;font-size:1.2rem;font-weight:700}
-    
-    /* 加了背景圖片的 gameBoard */
+*{box-sizing:border-box}
+body{margin:0;font-family:"Noto Sans TC",sans-serif;background:#f0f4f8;height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:flex-start;-webkit-user-select:none;user-select:none;overflow:hidden}
+#scoreBoard{margin-top:.5rem;font-size:1.2rem;font-weight:700}
 #gameBoard {
   position: relative;
   width: 100%;
   max-width: 480px;
-  height: 640px; /* 固定為640px高 */
+  height: 80vh;
+  max-height: 700px;
   background-image: url('village_background.png');
   background-size: cover;
   background-position: center;
@@ -26,38 +25,37 @@
   overflow: hidden;
   display: none;
 }
-
-    .block{position:absolute;width:56px;height:56px;background:#8bc34a;border:2px solid #558b2f;border-radius:4px;color:#fff;font-size:1.5rem;font-weight:700;display:flex;align-items:center;justify-content:center;touch-action:none}
-    .stacked{background:#4caf50}
-    #slotContainer{position:absolute;bottom:8px;left:50%;transform:translateX(-50%);display:flex;gap:6px}
-    .slot{width:56px;height:56px;background:#e0e0e0;border:2px dashed #9e9e9e;border-radius:4px;display:flex;align-items:center;justify-content:center}
-    .slot.correct{border-color:#4caf50}
-    .slot.incorrect{border-color:#f44336}
-    .overlay{position:absolute;inset:0;background:rgba(0,0,0,.75);color:#fff;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:1rem;z-index:10}
-    .overlay h1{font-size:2rem;margin-bottom:1rem}
-    .overlay p{line-height:1.6;margin:0 auto 1.5rem;max-width:350px}
-    .overlay button{margin:.4rem;padding:.6rem 1.4rem;border:none;border-radius:4px;background:#ffeb3b;font-size:1rem;font-weight:700;cursor:pointer}
+.block{position:absolute;width:56px;height:56px;background:#8bc34a;border:2px solid #558b2f;border-radius:4px;color:#fff;font-size:1.5rem;font-weight:700;display:flex;align-items:center;justify-content:center;touch-action:none}
+.stacked{background:#4caf50}
+#slotContainer{position:absolute;bottom:8px;left:50%;transform:translateX(-50%);display:flex;gap:6px}
+.slot{width:56px;height:56px;background:#e0e0e0;border:2px dashed #9e9e9e;border-radius:4px;display:flex;align-items:center;justify-content:center}
+.slot.correct{border-color:#4caf50}
+.slot.incorrect{border-color:#f44336}
+.overlay{position:absolute;inset:0;background:rgba(0,0,0,.75);color:#fff;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:1rem;z-index:10}
+.overlay h1{font-size:2rem;margin-bottom:1rem}
+.overlay p{line-height:1.6;margin:0 auto 1.5rem;max-width:350px}
+.overlay button{margin:.4rem;padding:.6rem 1.4rem;border:none;border-radius:4px;background:#ffeb3b;font-size:1rem;font-weight:700;cursor:pointer}
 </style>
 </head>
 <body>
-  <div id="scoreBoard" style="display:none">分數：0 / 20</div>  <!-- 遊戲簡介頁 -->  <div id="introOverlay" class="overlay">
-    <h1>成語方塊遊戲</h1>
-    <p>遊戲規則：拖曳掉落的字塊，<br>放入底部 4 個方格，<br>拼出正確成語即可得分。<br>每 10 秒會掉落新一組字塊。<br>玩家必須不定時調整字塊位置，<br>避免字塊堆疊到頂，<br>否則遊戲會自動結束。</p>
-    <button id="startBtn">開始遊戲</button>
-  </div>  <!-- 遊戲區域 -->  <div id="gameBoard">
-    <div id="slotContainer">
-      <div class="slot" data-index="0"></div>
-      <div class="slot" data-index="1"></div>
-      <div class="slot" data-index="2"></div>
-      <div class="slot" data-index="3"></div>
-    </div>
-    <div id="messageOverlay" class="overlay" style="visibility:hidden"></div>
-  </div><script>
-// -------------------- 資料 --------------------
+<div id="scoreBoard" style="display:none"> 分數：0 / 20</div>
+<div id="introOverlay" class="overlay">
+<h1>成語方塊遊戲</h1>
+<p>遊戲規則：拖書掉落的字塊，<br>放入底部 4 個方格，<br>拼出正確成語即可得分。<br>每 10 秒會掉落新一組字塊，<br>玩家需要自行調整字塊位置，<br>避免字塊堆疊到頂，<br>否則遊戲將會自動結束。</p>
+<button id="startBtn">開始遊戲</button>
+</div>
+<div id="gameBoard">
+<div id="slotContainer">
+<div class="slot" data-index="0"></div>
+<div class="slot" data-index="1"></div>
+<div class="slot" data-index="2"></div>
+<div class="slot" data-index="3"></div>
+</div>
+<div id="messageOverlay" class="overlay" style="visibility:hidden"></div>
+</div>
+<script>
 const idioms=["一竅不通","不恥下問","茅塞頓開","發人深省","今非昔比","老生常談","拋磚引玉","拾人牙慧","語無倫次","強詞奪理","一片冰心","大義凜然","出爾反爾","守正不阿","古道熱腸","坐懷不亂","道不拾遺","見義勇為","涓滴歸公","飲水思源"];
 const distractorPool="天地玄黃宇宙洪荒日月盈昃辰宿列張寒來暑往秋收冬藏閏餘成歲律呂調陽雲騰致雨露結為霜風雨雷電山川草木鳥獸蟲魚江河湖海星辰光陰歲月花草樹木".split("");
-
-// -------------------- DOM --------------------
 const board=document.getElementById('gameBoard');
 const slots=[...document.querySelectorAll('.slot')];
 const overlay=document.getElementById('messageOverlay');
@@ -65,45 +63,32 @@ const scoreBoard=document.getElementById('scoreBoard');
 const slotContainer=document.getElementById('slotContainer');
 const intro=document.getElementById('introOverlay');
 const startBtn=document.getElementById('startBtn');
-
-// -------------------- 狀態 --------------------
 let score=0,usedIdioms=new Set(),fallIntervals=[],spawnInterval;
-
-// -------------------- 工具 --------------------
 const rand=(min,max)=>Math.floor(Math.random()*(max-min+1))+min;
 const shuffle=a=>{for(let i=a.length-1;i>0;i--){const j=rand(0,i);[a[i],a[j]]=[a[j],a[i]];}return a;};
 const updateScore=()=>scoreBoard.textContent=`分數：${score} / 20`;
 const bottomLimit=()=>board.offsetHeight-slotContainer.offsetHeight-8;
-
-// -------------------- 遊戲控制 --------------------
-startBtn.onclick=()=>{
-  intro.style.display='none';
-  board.style.display='block';
-  scoreBoard.style.display='block';
-  startGame();
-};
-
+const fallSpeed=()=>board.offsetHeight/320;
+startBtn.onclick=()=>{intro.style.display='none';board.style.display='block';scoreBoard.style.display='block';startGame();};
 function startGame(){spawnBlocks();spawnInterval=setInterval(spawnBlocks,10000);}
-
-// -------------------- 生成字塊 --------------------
 function spawnBlocks(){if(overlay.style.visibility==='visible')return;if(usedIdioms.size===idioms.length)usedIdioms.clear();let idm;do{idm=idioms[rand(0,idioms.length-1)];}while(usedIdioms.has(idm));usedIdioms.add(idm);const chars=idm.split("");const dis=[];while(dis.length<2){const c=distractorPool[rand(0,distractorPool.length-1)];if(!chars.includes(c)&&!dis.includes(c))dis.push(c);}shuffle([...chars,...dis]).forEach((c,i)=>setTimeout(()=>createBlock(c),i*300));}
 function createBlock(ch){const b=document.createElement('div');b.className='block';b.textContent=ch;b.dataset.char=ch;b.style.left=`${rand(0,board.clientWidth-56)}px`;b.style.top='-60px';board.appendChild(b);makeDraggable(b);startFalling(b);}
-
-// -------------------- 下落 --------------------
-function startFalling(bl){const id=setInterval(()=>{if(bl.isDragging)return;const nxt=bl.offsetTop+2;if(nxt+56>=bottomLimit()||[...board.querySelectorAll('.block.stacked')].some(b=>collide(bl,b,2))){settle(bl,id);}else bl.style.top=`${nxt}px`;},16);bl.fallID=id;fallIntervals.push(id);}    
+function startFalling(bl){const id=setInterval(()=>{if(bl.isDragging)return;const nxt=bl.offsetTop+fallSpeed();if(nxt+56>=bottomLimit()||[...board.querySelectorAll('.block.stacked')].some(b=>collide(bl,b,2))){settle(bl,id);}else bl.style.top=`${nxt}px`;},16);bl.fallID=id;fallIntervals.push(id);}    
 function settle(bl,id){clearInterval(id);fallIntervals=fallIntervals.filter(x=>x!==id);bl.classList.add('stacked');bl.fallID=null;checkGameOver();}
 function collide(a,b,o=0){if(a===b)return false;const r1=a.getBoundingClientRect(),r2=b.getBoundingClientRect();return r1.left<r2.right&&r1.right>r2.left&&r1.bottom+o>r2.top&&r1.top<r2.bottom;}
-
-// -------------------- 拖放 --------------------
 function makeDraggable(el){interact(el).draggable({listeners:{start(){el.isDragging=true;if(el.parentElement.classList.contains('slot')){const slt=el.parentElement;slt.dataset.char='';slt.classList.remove('correct','incorrect');board.appendChild(el);const br=board.getBoundingClientRect(),sr=slt.getBoundingClientRect();el.style.left=`${sr.left-br.left}px`;el.style.top=`${sr.top-br.top}px`;el.style.position='absolute';el.setAttribute('data-x',0);el.setAttribute('data-y',0);if(el.fallID==null)startFalling(el);} },move(e){let x=(+el.getAttribute('data-x')||0)+e.dx;let y=(+el.getAttribute('data-y')||0)+e.dy;const maxX=board.clientWidth-el.offsetWidth,maxY=board.clientHeight-el.offsetHeight;x=Math.min(Math.max(x+el.offsetLeft,0),maxX)-el.offsetLeft;y=Math.min(Math.max(y+el.offsetTop,0),maxY)-el.offsetTop;el.style.transform=`translate(${x}px,${y}px)`;el.setAttribute('data-x',x);el.setAttribute('data-y',y);},end(){el.isDragging=false;}},inertia:true,modifiers:[interact.modifiers.restrictRect({restriction: board,endOnly:true})]});}
 interact('.slot').dropzone({accept:'.block',overlap:0.4,ondropactivate(e){e.target.classList.remove('correct','incorrect');},ondrop(e){const slt=e.target,blk=e.relatedTarget;if(slt.firstElementChild)return;if(blk.fallID){clearInterval(blk.fallID);fallIntervals=fallIntervals.filter(x=>x!==blk.fallID);blk.fallID=null;}blk.style.transform='none';blk.setAttribute('data-x',0);blk.setAttribute('data-y',0);blk.style.position='static';slt.appendChild(blk);slt.dataset.char=blk.dataset.char;checkSlots();}});
-
-// -------------------- 檢查 --------------------
 function checkSlots(){const str=slots.map(s=>s.dataset.char||'').join('');if(str.length!==4)return;if(idioms.includes(str)){slots.forEach(s=>s.classList.add('correct'));setTimeout(()=>{slots.forEach(s=>{if(s.firstElementChild)s.firstElementChild.remove();s.dataset.char='';s.classList.remove('correct');});score++;updateScore();if(score>=20)endGame('🏆 恭喜你取得滿分！');},600);}else{slots.forEach(s=>s.classList.add('incorrect'));}}
-
-// -------------------- Game Over --------------------
 function checkGameOver(){const topY=board.getBoundingClientRect().top;if([...board.querySelectorAll('.block.stacked')].some(b=>b.getBoundingClientRect().top<=topY+10))endGame('Game Over😭');}
-function clearAll(){fallIntervals.forEach(id=>clearInterval(id));fallIntervals=[];clearInterval(spawnInterval);} 
+function clearAll(){fallIntervals.forEach(id=>clearInterval(id));fallIntervals=[];clearInterval(spawnInterval);}
 function endGame(msg){clearAll();overlay.innerHTML=`${msg}<br/>`;const r=document.createElement('button');r.textContent='重新開始';r.onclick=()=>location.reload();const e=document.createElement('button');e.textContent='結束遊戲';e.onclick=()=>{overlay.innerHTML='謝謝參與😀';};overlay.appendChild(r);overlay.appendChild(e);overlay.style.visibility='visible';}
-</script></body>
+window.addEventListener('resize', ()=>{
+  [...document.querySelectorAll('.block')].forEach(block => {
+    if (!block.isDragging) {
+      block.style.top = `${Math.min(parseInt(block.style.top)||0, bottomLimit()-56)}px`;
+    }
+  });
+});
+</script>
+</body>
 </html>
